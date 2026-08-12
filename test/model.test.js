@@ -54,6 +54,82 @@ module.exports = function (t, h) {
   FT.autoArrange();
   t.ok(overlaps(FT.peopleList()) === 0, 'still no overlaps after edits and a re-tidy');
 
+  t.section('a partner from another generation');
+  // Rare but real: someone partnered with a descendant. Levelling them onto one
+  // row is impossible, and the old layout chased its own tail until the pass cap
+  // stopped it, ~16,000px down the canvas.
+  const cross = h.loadHeadless();
+  cross.state = cross.demoTree();
+  const c = {};
+  cross.peopleList().forEach((p) => (c[p.name.split(' ')[0]] = p));
+  t.ok(cross.linkAsPartners(c.Josip.id, c.Petra.id), 'a grandparent can be partnered with a grandchild');
+  t.ok(
+    !cross.parentsOf(c.Marko.id).includes(c.Petra.id),
+    'and that does not retroactively make her a parent of her own father'
+  );
+  t.ok(cross.ancestrallyRelated(c.Josip.id, c.Petra.id), 'the pair is recognised as ancestrally related');
+
+  const started = Date.now();
+  cross.autoArrange();
+  const took = Date.now() - started;
+  const rows = cross.peopleList().map((p) => p.y / cross.ROW_H);
+  t.ok(took < 2000, 'the layout still settles quickly (' + took + 'ms)');
+  t.ok(Math.max(...rows) === 2, 'and keeps its three generations (max row ' + Math.max(...rows) + ')');
+  t.ok(cross.state.people[c.Josip.id].y === 0, 'the grandparent stays on the top row');
+  t.ok(
+    cross.state.people[c.Petra.id].y === 2 * cross.ROW_H,
+    'the grandchild stays two rows below, not dragged up to meet them'
+  );
+  t.ok(overlaps(cross.peopleList()) === 0, 'nothing overlaps');
+  t.ok(
+    cross.isCrossGenerationUnion(cross.unionsOf(c.Josip.id).find((u) => u.partners.includes(c.Petra.id))),
+    'the link is flagged so it can be drawn as a cross-generation one'
+  );
+
+  t.section('partnering never rewrites parentage into a loop');
+  // Joining a union with a free seat also adopts its children. Fine for a lone
+  // parent gaining a partner; a loop if those children are the partner's own
+  // ancestors — which sent the layout to row 400 before this guard existed.
+  const loop = h.loadHeadless();
+  loop.state = loop.demoTree();
+  const l = {};
+  loop.peopleList().forEach((p) => (l[p.name.split(' ')[0]] = p));
+  const grandUnion = loop.unionsOf(l.Josip.id)[0];
+  loop.dissolveUnion(grandUnion.id); // leaves Josip a lone parent with a free seat
+  t.ok(grandUnion.partners.length === 1, 'a union with one partner and children has a free seat');
+  loop.linkAsPartners(l.Josip.id, l.Petra.id);
+  t.ok(
+    !grandUnion.children.includes(l.Marko.id) || grandUnion.partners.indexOf(l.Petra.id) < 0,
+    'the descendant is not seated into the union that produced her own father'
+  );
+  t.ok(loop.partnersOf(l.Josip.id).includes(l.Petra.id), 'but the partnership is still recorded');
+  loop.autoArrange();
+  t.ok(
+    Math.max(...loop.peopleList().map((p) => p.y / loop.ROW_H)) <= 3,
+    'and the layout stays sane (max row ' + Math.max(...loop.peopleList().map((p) => p.y / loop.ROW_H)) + ')'
+  );
+
+  t.section('removing a single relationship');
+  const doc = h.loadHeadless();
+  doc.state = doc.demoTree();
+  const d = {};
+  doc.peopleList().forEach((p) => (d[p.name.split(' ')[0]] = p));
+  const married = doc.unionsOf(d.Josip.id)[0];
+  const hadChildren = married.children.slice();
+  doc.dissolveUnion(married.id);
+  t.ok(doc.state.unions[married.id].partners.length === 1, 'dissolving a couple with children keeps one parent');
+  t.ok(hadChildren.every((k) => doc.parentsOf(k).length === 1), 'the children keep that parent');
+
+  const childless = doc.newUnion({ partners: [d.Vera.id, d.Luka.id], children: [] });
+  doc.state.unions[childless.id] = childless;
+  doc.dissolveUnion(childless.id);
+  t.ok(!doc.state.unions[childless.id], 'a childless couple simply goes away');
+
+  const u2 = doc.unionsOf(d.Marko.id)[0];
+  doc.detachChild(u2.id, d.Petra.id);
+  t.ok(!doc.parentUnionOf(d.Petra.id), 'a detached child has no parents');
+  t.ok(!!doc.state.people[d.Petra.id], 'but is still in the tree');
+
   t.section('dates');
   t.ok(FT.isIsoDate('1921-03-14') && !FT.isIsoDate('1921'), 'recognises a full date');
   t.ok(FT.yearOf('1921-03-14') === '1921', 'takes the year from a picked date');

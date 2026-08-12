@@ -8,11 +8,13 @@
   const nodes = document.getElementById('nodes');
   const guides = document.getElementById('guides');
   const pill = document.getElementById('pill');
+  const edgePill = document.getElementById('edgePill');
 
   const view = { x: 120, y: 120, z: 1 };
   const SNAP_RANGE = 14; // world px within which a card magnets to a neighbour's axis
 
   FT.selected = null;
+  FT.selectedEdge = null;
   let linkMode = null; // 'partner' | 'child' — awaiting a second click
   let cards = {}; // id -> element
 
@@ -24,6 +26,7 @@
     stage.style.backgroundSize = FT.GRID * view.z + 'px ' + FT.GRID * view.z + 'px';
     stage.style.backgroundPosition = view.x + 'px ' + view.y + 'px';
     positionPill();
+    positionEdgePill();
   }
 
   function screenToWorld(sx, sy) {
@@ -129,13 +132,45 @@
 
     drawEdges();
     positionPill();
+    positionEdgePill();
   };
 
-  /* Orthogonal connectors: a couple's bar, a drop from the union point, a
-     sibling bus, and a riser into each child. */
+  /* Orthogonal connectors, one path per relationship so each can be clicked.
+     Each visible line is shadowed by a fat transparent "hit" path — a 2px line
+     is far too thin to aim at. Children each get the whole route from the union
+     down to themselves; the shared segments coincide, so it looks like one bus
+     but highlights as a single link. */
+
+  let edgeMids = {}; // where to park the pill for each edge
+
+  function edgeKey(kind, unionId, childId) {
+    return kind + ':' + unionId + ':' + (childId || '');
+  }
+
+  function isEdgeSelected(kind, unionId, childId) {
+    const s = FT.selectedEdge;
+    return (
+      !!s && s.kind === kind && s.unionId === unionId &&
+      (s.childId || '') === (childId || '')
+    );
+  }
+
   function drawEdges() {
-    const parts = [];
+    const visible = [];
+    const hits = [];
     const marks = [];
+    edgeMids = {};
+
+    const emit = function (kind, unionId, childId, d, extra) {
+      const attrs =
+        ' data-kind="' + kind + '" data-union="' + unionId + '"' +
+        (childId ? ' data-child="' + childId + '"' : '');
+      const cls =
+        'edge' + (extra ? ' ' + extra : '') +
+        (isEdgeSelected(kind, unionId, childId) ? ' selected' : '');
+      visible.push('<path class="' + cls + '"' + attrs + ' d="' + d + '"/>');
+      hits.push('<path class="edge-hit"' + attrs + ' d="' + d + '"/>');
+    };
 
     FT.unionList().forEach(function (u) {
       const partners = u.partners
@@ -149,25 +184,47 @@
       if (partners.length >= 2) {
         const a = partners[0];
         const b = partners[1];
+        const crossGen = FT.isCrossGenerationUnion(u);
         const midY = (a.y + b.y) / 2 + FT.CARD_H / 2;
         const leftP = a.x <= b.x ? a : b;
         const rightP = a.x <= b.x ? b : a;
         const x1 = leftP.x + FT.CARD_W;
         const x2 = rightP.x;
-        // Partner bar. If the cards overlap horizontally the bar would be
-        // backwards, so route it under both instead.
-        if (x2 > x1) {
-          parts.push('M' + x1 + ' ' + (leftP.y + FT.CARD_H / 2) +
-                     'H' + (x1 + x2) / 2 + 'V' + midY +
-                     'H' + x2 + 'V' + (rightP.y + FT.CARD_H / 2));
+        let d;
+
+        if (crossGen) {
+          // These two are rows apart, so the usual squared-off bar would stride
+          // across whole generations and read as a mistake. A curve between the
+          // facing edges reads as the deliberate, unusual link it is.
+          const sx = x1;
+          const sy = leftP.y + FT.CARD_H / 2;
+          const ex = x2 > x1 ? x2 : rightP.x + FT.CARD_W;
+          const ey = rightP.y + FT.CARD_H / 2;
+          const bow = Math.max(70, Math.abs(ex - sx) / 2);
+          d = 'M' + sx + ' ' + sy +
+              'C' + (sx + bow) + ' ' + sy + ',' + (ex - bow) + ' ' + ey + ',' + ex + ' ' + ey;
+          // A cubic with horizontal handles passes exactly through the midpoint
+          // of its endpoints at t=0.5.
+          anchorX = (sx + ex) / 2;
+          anchorY = (sy + ey) / 2;
+        } else if (x2 > x1) {
+          d = 'M' + x1 + ' ' + (leftP.y + FT.CARD_H / 2) +
+              'H' + (x1 + x2) / 2 + 'V' + midY +
+              'H' + x2 + 'V' + (rightP.y + FT.CARD_H / 2);
+          anchorX = (a.x + b.x) / 2 + FT.CARD_W / 2;
+          anchorY = midY;
         } else {
-          parts.push('M' + (leftP.x + FT.CARD_W / 2) + ' ' + (leftP.y + FT.CARD_H) +
-                     'V' + (Math.max(a.y, b.y) + FT.CARD_H + 24) +
-                     'H' + (rightP.x + FT.CARD_W / 2) + 'V' + (rightP.y + FT.CARD_H));
+          // Cards overlap horizontally — the bar would run backwards, so route
+          // it underneath both instead.
+          d = 'M' + (leftP.x + FT.CARD_W / 2) + ' ' + (leftP.y + FT.CARD_H) +
+              'V' + (Math.max(a.y, b.y) + FT.CARD_H + 24) +
+              'H' + (rightP.x + FT.CARD_W / 2) + 'V' + (rightP.y + FT.CARD_H);
+          anchorX = (a.x + b.x) / 2 + FT.CARD_W / 2;
+          anchorY = midY;
         }
-        anchorX = (a.x + b.x) / 2 + FT.CARD_W / 2;
-        anchorY = midY;
-        marks.push({ x: anchorX, y: anchorY });
+        emit('partner', u.id, null, d, crossGen ? 'cross-gen' : '');
+        edgeMids[edgeKey('partner', u.id, null)] = { x: anchorX, y: anchorY };
+        marks.push({ x: anchorX, y: anchorY, crossGen: crossGen });
       } else {
         anchorX = partners[0].x + FT.CARD_W / 2;
         anchorY = partners[0].y + FT.CARD_H;
@@ -180,35 +237,29 @@
         .filter(Boolean);
       if (!children.length) return;
 
-      const topChildY = Math.min.apply(
-        null,
-        children.map(function (c) {
-          return c.y;
-        })
-      );
+      const topChildY = Math.min.apply(null, children.map(function (c) { return c.y; }));
       const busY = Math.max(anchorY + 40, topChildY - 40);
-      const centers = children.map(function (c) {
-        return c.x + FT.CARD_W / 2;
-      });
-      const minC = Math.min.apply(null, centers.concat([anchorX]));
-      const maxC = Math.max.apply(null, centers.concat([anchorX]));
 
-      parts.push('M' + anchorX + ' ' + anchorY + 'V' + busY);
-      if (maxC > minC) parts.push('M' + minC + ' ' + busY + 'H' + maxC);
       children.forEach(function (c) {
-        parts.push('M' + (c.x + FT.CARD_W / 2) + ' ' + busY + 'V' + c.y);
+        const cx = c.x + FT.CARD_W / 2;
+        const d = 'M' + anchorX + ' ' + anchorY + 'V' + busY + 'H' + cx + 'V' + c.y;
+        emit('child', u.id, c.id, d, '');
+        edgeMids[edgeKey('child', u.id, c.id)] = { x: (anchorX + cx) / 2, y: busY };
       });
     });
 
-    let svg = '<path class="edge" d="' + parts.join(' ') + '"/>';
-    marks.forEach(function (m) {
-      svg +=
-        '<path class="union-mark" d="M' + m.x + ' ' + (m.y - 6) +
+    const markSvg = marks.map(function (m) {
+      return (
+        '<path class="union-mark' + (m.crossGen ? ' cross-gen' : '') +
+        '" d="M' + m.x + ' ' + (m.y - 6) +
         'L' + (m.x + 6) + ' ' + m.y +
         'L' + m.x + ' ' + (m.y + 6) +
-        'L' + (m.x - 6) + ' ' + m.y + 'Z"/>';
+        'L' + (m.x - 6) + ' ' + m.y + 'Z"/>'
+      );
     });
-    edges.innerHTML = svg;
+
+    // Hit paths last so they sit on top and catch the clicks.
+    edges.innerHTML = visible.join('') + markSvg.join('') + hits.join('');
   }
 
   // ------------------------------------------------------------- action pill
@@ -227,8 +278,31 @@
     pill.style.top = Math.round(r.top + sy - 14) + 'px';
   }
 
+  function positionEdgePill() {
+    const s = FT.selectedEdge;
+    const mid = s && edgeMids[edgeKey(s.kind, s.unionId, s.childId)];
+    if (!s || !mid || FT.readOnly) {
+      edgePill.hidden = true;
+      return;
+    }
+    edgePill.hidden = false;
+    document.getElementById('edgeLabel').textContent = FT.edgeLabel(s);
+    const r = stage.getBoundingClientRect();
+    edgePill.style.left = Math.round(r.left + view.x + mid.x * view.z) + 'px';
+    edgePill.style.top = Math.round(r.top + view.y + mid.y * view.z - 14) + 'px';
+  }
+
   FT.select = function (id) {
     FT.selected = id;
+    FT.selectedEdge = null;
+    linkMode = null;
+    stage.classList.remove('linking');
+    FT.render();
+  };
+
+  FT.selectEdge = function (sel) {
+    FT.selectedEdge = sel;
+    FT.selected = null;
     linkMode = null;
     stage.classList.remove('linking');
     FT.render();
@@ -306,6 +380,17 @@
   }
 
   stage.addEventListener('pointerdown', function (e) {
+    // A line is a relationship: clicking one selects it so it can be removed.
+    const edgeEl = e.target.closest && e.target.closest('[data-kind]');
+    if (edgeEl && !FT.readOnly && !linkMode) {
+      FT.selectEdge({
+        kind: edgeEl.dataset.kind,
+        unionId: edgeEl.dataset.union,
+        childId: edgeEl.dataset.child || null,
+      });
+      return;
+    }
+
     const cardEl = e.target.closest('.card');
 
     if (cardEl) {
@@ -356,6 +441,7 @@
       linkMode = null;
       stage.classList.remove('linking');
     }
+    FT.selectedEdge = null;
     FT.select(null);
     drag = {
       pan: true,
@@ -393,6 +479,7 @@
     showGuides(snapped.guideX, snapped.guideY);
     drawEdges();
     positionPill();
+    positionEdgePill();
   });
 
   function endDrag(e) {

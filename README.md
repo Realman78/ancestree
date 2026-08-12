@@ -33,6 +33,18 @@ Select a card to get its action bar: add a parent, partner or child, or use
 canvas. Links that would loop the tree (making someone their own ancestor) are
 refused.
 
+**The lines are relationships, and you can click them.** A selected line
+highlights along its whole route and offers **Remove link**; `Del` does the same.
+Removing a partner line separates the couple — if they had children the union
+stays with the first partner, so nobody is orphaned, and the confirmation says so
+by name. Removing a child line detaches that person from their parents and leaves
+them on the canvas. Both are undoable.
+
+**Partners from different generations** — someone partnered with a descendant —
+are rare but real, and are drawn as a dashed curve instead of the usual squared
+connector. Such a couple cannot share a generation row, so they keep their own,
+and partnering never rewrites who anyone's parents are.
+
 **Photos.** Drag an image file straight onto a card, or open someone's book and
 click their portrait. The picture is cropped square and downscaled to a 256px
 thumbnail before it is stored — a 240 KB photo lands at about 4 KB — so trees
@@ -77,7 +89,8 @@ for a `.json` file.
 ## Keys
 
 `N` new person · `A` tidy up · `F` fit to screen · `Enter` open book ·
-`Del` remove · `Ctrl+Z` / `Ctrl+Shift+Z` undo, redo · drag background to pan ·
+`Del` remove the selected person or link · `Esc` deselect ·
+`Ctrl+Z` / `Ctrl+Shift+Z` undo, redo · drag background to pan ·
 `Ctrl+scroll` to zoom.
 
 ## Layout
@@ -106,6 +119,10 @@ test/             npm test — five jsdom suites plus a real-browser pass
 - **One partnership per couple.** A person can have several partners, but
   remarriages and step-families draw as separate unions rather than anything
   cleverer, and a child belongs to exactly one union.
+- **Separating a couple keeps the children with the first partner**, which is
+  arbitrary — there is no way to choose, or to split them between the two.
+- **A cross-generation link routes as the crow flies** and can pass behind other
+  cards. It is legible and clearly marked, but not routed around obstacles.
 - **Photos are stored inside the document**, not as files, and only the
   thumbnail is kept — the original resolution is gone once you drop it in. That
   keeps sharing and export self-contained, but it is not somewhere to archive

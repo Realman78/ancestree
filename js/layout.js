@@ -8,29 +8,23 @@
 (function () {
   const FT = window.FT;
 
-  /* Row index per person. Iterative relaxation rather than a topological sort so
-     that a malformed (cyclic) document degrades instead of hanging. */
-  function generations() {
+  const MAX_PASSES = 200;
+
+  /* Rows from ancestry alone: a child always sits below every parent. The
+     parent-child graph is acyclic (linkAsChild refuses loops), so this settles. */
+  function ancestryRows() {
     const gen = {};
     FT.peopleList().forEach(function (p) {
       gen[p.id] = 0;
     });
     const unions = FT.unionList();
-    for (let pass = 0; pass < 40; pass++) {
+    for (let pass = 0; pass < MAX_PASSES; pass++) {
       let changed = false;
       unions.forEach(function (u) {
-        // Partners live on the same row: pull both to the lower one.
         let top = 0;
         u.partners.forEach(function (pid) {
           top = Math.max(top, gen[pid] || 0);
         });
-        u.partners.forEach(function (pid) {
-          if (gen[pid] !== top) {
-            gen[pid] = top;
-            changed = true;
-          }
-        });
-        // Children sit one row below.
         u.children.forEach(function (cid) {
           if ((gen[cid] || 0) < top + 1) {
             gen[cid] = top + 1;
@@ -43,9 +37,64 @@
     return gen;
   }
 
+  /* Then pull couples onto a shared row where that is possible.
+
+     It is not always possible. If a couple are also ancestor and descendant of
+     one another — someone partnered with a grandchild, say — then levelling
+     them pushes the descendant down, which pushes the ancestor down to match,
+     forever. The old single-pass version did exactly that and drove the whole
+     tree thousands of pixels down the canvas before the pass cap stopped it.
+
+     So: skip alignment for an ancestrally-related couple, and if the pass still
+     fails to settle (possible for longer loops through several unions), give up
+     on alignment altogether rather than return a runaway layout. */
+  function alignPartners(gen) {
+    const unions = FT.unionList();
+    for (let pass = 0; pass < MAX_PASSES; pass++) {
+      let changed = false;
+      unions.forEach(function (u) {
+        if (u.partners.length >= 2 && !FT.ancestrallyRelated(u.partners[0], u.partners[1])) {
+          let top = 0;
+          u.partners.forEach(function (pid) {
+            top = Math.max(top, gen[pid] || 0);
+          });
+          u.partners.forEach(function (pid) {
+            if (gen[pid] !== top) {
+              gen[pid] = top;
+              changed = true;
+            }
+          });
+        }
+        let top = 0;
+        u.partners.forEach(function (pid) {
+          top = Math.max(top, gen[pid] || 0);
+        });
+        u.children.forEach(function (cid) {
+          if ((gen[cid] || 0) < top + 1) {
+            gen[cid] = top + 1;
+            changed = true;
+          }
+        });
+      });
+      if (!changed) return gen;
+    }
+    return null; // did not settle
+  }
+
+  function generations() {
+    const base = ancestryRows();
+    return alignPartners(Object.assign({}, base)) || base;
+  }
+
+  /* Partners who could not be levelled onto one row. The renderer draws these
+     differently so they read as a deliberate cross-generation link. */
+  FT.isCrossGenerationUnion = function (u) {
+    return u.partners.length >= 2 && FT.ancestrallyRelated(u.partners[0], u.partners[1]);
+  };
+
   /* Size a subtree rooted at `pid`. `seen` prevents a person being laid out
      twice when they are reachable by more than one path. */
-  function measure(pid, seen) {
+  function measure(pid, seen, gen) {
     if (seen[pid]) return null;
     seen[pid] = true;
 
@@ -54,13 +103,15 @@
 
     FT.unionsOf(pid).forEach(function (u) {
       u.partners.forEach(function (q) {
-        if (q !== pid && !seen[q]) {
+        // Only seat a partner beside this person if they share a row. One who
+        // could not be levelled is laid out from their own place in the tree.
+        if (q !== pid && !seen[q] && gen[q] === gen[pid]) {
           seen[q] = true;
           partnerIds.push(q);
         }
       });
       u.children.forEach(function (c) {
-        const block = measure(c, seen);
+        const block = measure(c, seen, gen);
         if (block) childBlocks.push(block);
       });
     });
@@ -118,7 +169,7 @@
     let cursor = 0;
 
     roots.forEach(function (root) {
-      const block = measure(root.id, seen);
+      const block = measure(root.id, seen, gen);
       if (!block) return;
       place(block, cursor, xs);
       cursor += block.w + FT.ROOT_GAP;

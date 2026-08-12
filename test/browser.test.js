@@ -93,6 +93,114 @@ module.exports = async function (t, h) {
     await page.waitForTimeout(700);
     t.ok(await page.evaluate(() => FT.peopleList().every((p) => p.x % 20 === 0 && p.y % 20 === 0)), '"Tidy up" re-lays the tree');
 
+    t.section('clicking a relationship line');
+    await page.evaluate(() => {
+      localStorage.clear();
+      location.reload();
+    });
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(600);
+    await page.click('[data-action="arrange"]');
+    await page.waitForTimeout(800);
+
+    // Aim a real mouse click at a point actually ON the stroke, to prove the hit
+    // target is reachable and not buried. (A bounding-box centre is no good: an
+    // orthogonal path's box centre usually lies off the line entirely, and here
+    // it lands on a child connector instead.)
+    const target = await page.evaluate(() => {
+      const p = document.querySelector('#edges path.edge-hit[data-kind="partner"]');
+      const pt = p.getPointAtLength(p.getTotalLength() * 0.15);
+      const m = p.getScreenCTM();
+      return {
+        x: m.a * pt.x + m.c * pt.y + m.e,
+        y: m.b * pt.x + m.d * pt.y + m.f,
+        union: p.dataset.union,
+      };
+    });
+    await page.mouse.click(target.x, target.y);
+    await page.waitForTimeout(350);
+    t.ok(
+      (await page.evaluate(() => (FT.selectedEdge || {}).kind)) === 'partner',
+      'a partner line can be clicked and selected'
+    );
+    t.ok((await page.locator('#edges path.edge.selected').count()) === 1, 'and is highlighted');
+    t.ok(await page.locator('#edgePill').isVisible(), 'a pill appears on the line');
+    t.ok((await page.locator('#edgeLabel').textContent()).includes('&'), 'naming both partners');
+    t.ok(!(await page.locator('#pill').isVisible()), 'the card pill is hidden');
+
+    // Panning must not leave the pill behind.
+    const pillBefore = await page.locator('#edgePill').boundingBox();
+    await page.mouse.move(700, 700);
+    await page.mouse.down();
+    await page.mouse.move(760, 740, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    const pillAfter = await page.locator('#edgePill').boundingBox();
+    t.ok(
+      pillAfter === null || Math.abs(pillAfter.x - pillBefore.x - 60) < 6,
+      'the pill tracks the line when the canvas is panned'
+    );
+
+    t.section('deleting a line with the keyboard');
+    await page.evaluate(() => {
+      const u = FT.unionList().find((x) => x.partners.length === 2 && x.children.length);
+      FT.selectEdge({ kind: 'partner', unionId: u.id, childId: null });
+      window.__u = u.id;
+      window.__kids = u.children.slice();
+      window.__keeper = u.partners[0];
+    });
+    await page.waitForTimeout(250);
+    page.once('dialog', (dlg) => {
+      dlg.accept();
+    });
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(400);
+    t.ok(
+      await page.evaluate(() => FT.state.unions[window.__u].partners.length === 1),
+      'Delete removes the selected line'
+    );
+    t.ok(
+      await page.evaluate(() => window.__kids.every((k) => FT.parentsOf(k).includes(window.__keeper))),
+      'and the children keep a parent'
+    );
+    t.ok((await page.locator('#edges path.edge.selected').count()) === 0, 'the highlight clears');
+    t.ok(!(await page.locator('#edgePill').isVisible()), 'and so does the pill');
+
+    // Cancelling must not change anything.
+    await page.evaluate(() => {
+      const u = FT.unionList().find((x) => x.children.length);
+      FT.selectEdge({ kind: 'child', unionId: u.id, childId: u.children[0] });
+      window.__before = JSON.stringify(FT.state.unions);
+    });
+    page.once('dialog', (dlg) => {
+      dlg.dismiss();
+    });
+    await page.click('#edgePill [data-action="removeEdge"]');
+    await page.waitForTimeout(400);
+    t.ok(
+      await page.evaluate(() => JSON.stringify(FT.state.unions) === window.__before),
+      'declining the confirmation changes nothing'
+    );
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(250);
+    t.ok(await page.evaluate(() => FT.selectedEdge === null), 'Escape deselects a line');
+
+    t.section('a cross-generation partner draws differently');
+    await page.evaluate(() => {
+      const ids = Object.keys(FT.state.people);
+      const gp = ids.find((i) => FT.state.people[i].name.startsWith('Josip'));
+      const gc = ids.find((i) => FT.state.people[i].name.startsWith('Petra'));
+      FT.linkAsPartners(gp, gc);
+      FT.autoArrange();
+      FT.render();
+    });
+    await page.waitForTimeout(500);
+    t.ok((await page.locator('#edges path.edge.cross-gen').count()) === 1, 'it is drawn as a dashed link');
+    t.ok(
+      await page.evaluate(() => FT.peopleList().every((p) => p.y / FT.ROW_H <= 3)),
+      'and the tree keeps its generations instead of running off the canvas'
+    );
+
     t.section('born / died date pickers');
     const josip = await page.evaluate(() =>
       Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Josip Kovač')

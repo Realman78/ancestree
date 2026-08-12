@@ -12,7 +12,13 @@ module.exports = async function (t, h) {
   t.ok(dom.errors.length === 0, 'no runtime errors on load' + (dom.errors.length ? ': ' + dom.errors[0] : ''));
   const nPeople = Object.keys(FT.state.people).length;
   t.ok($$('.card').length === nPeople, 'one card per person (' + nPeople + ')');
-  t.ok($('#edges path.edge').getAttribute('d').length > 50, 'connector paths are drawn');
+  // One path per relationship, each with a fat transparent twin to click.
+  const expectedEdges = FT.unionList().reduce(
+    (n, u) => n + (u.partners.length >= 2 ? 1 : 0) + u.children.length, 0);
+  t.ok($$('#edges path.edge').length === expectedEdges,
+    'one connector per relationship (' + expectedEdges + ')');
+  t.ok($$('#edges path.edge-hit').length === expectedEdges, 'each with a hit target');
+  t.ok($('#edges path.edge').getAttribute('d').length > 8, 'connector paths have geometry');
   t.ok($$('#edges .union-mark').length === 3, 'a union marker per couple');
   t.ok($$('.card .entry-count:not([hidden])').length === 3, 'diary badges only on people with entries');
   t.ok($('#treeTitle').value === FT.state.title, 'title field is bound to the document');
@@ -34,6 +40,37 @@ module.exports = async function (t, h) {
   FT.select(marko.dataset.id);
   $('#pill [data-action="parent"]').click();
   t.ok(Object.keys(FT.state.people).length === n, 'refuses a third parent');
+
+  t.section('relationship lines are selectable and removable');
+  const partnerUnion = FT.unionList().find((u) => u.partners.length === 2 && u.children.length);
+  FT.selectEdge({ kind: 'partner', unionId: partnerUnion.id, childId: null });
+  t.ok(!!$('#edges path.edge.selected'), 'a selected line is highlighted');
+  t.ok($('#pill').hidden, 'and the card pill gives way');
+  t.ok(FT.selected === null, 'selecting a line deselects any card');
+  t.ok(/&/.test(FT.edgeLabel(FT.selectedEdge)), 'the line is labelled with both names');
+
+  const keptChildren = partnerUnion.children.slice();
+  const keeper = partnerUnion.partners[0];
+  const dropped = partnerUnion.partners[1];
+  $('#edgePill [data-action="removeEdge"]').click();
+  t.ok(FT.state.unions[partnerUnion.id].partners.length === 1, 'removing a partner line separates the couple');
+  t.ok(FT.state.unions[partnerUnion.id].partners[0] === keeper, 'the union stays with the first partner');
+  t.ok(
+    keptChildren.every((c) => FT.parentsOf(c).includes(keeper)),
+    'their children keep that parent rather than being orphaned'
+  );
+  t.ok(!!FT.state.people[dropped], 'and the ex-partner stays on the canvas');
+  t.ok(FT.selectedEdge === null, 'the selection clears afterwards');
+
+  const childUnion = FT.unionList().find((u) => u.children.length);
+  const someChild = childUnion.children[0];
+  FT.selectEdge({ kind: 'child', unionId: childUnion.id, childId: someChild });
+  $('#edgePill [data-action="removeEdge"]').click();
+  t.ok(!FT.parentUnionOf(someChild), 'removing a child line detaches them from their parents');
+  t.ok(!!FT.state.people[someChild], 'but the person remains');
+
+  FT.undo();
+  t.ok(!!FT.parentUnionOf(someChild), 'undo restores a removed link');
 
   t.section('the book');
   const josip = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Josip Kovač');

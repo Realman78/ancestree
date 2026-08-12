@@ -188,8 +188,30 @@ body.read-only .edit-only { display: none; }
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
+  transition: stroke .12s, stroke-width .12s;
 }
+/* A couple who could not share a row — one is an ancestor of the other. */
+.edge.cross-gen { stroke-dasharray: 7 5; stroke: #a8917a; }
+
+.edge.selected {
+  stroke: var(--walnut);
+  stroke-width: 3.5;
+}
+
+/* Fat invisible twin of each line: a 2px stroke is far too thin to click. */
+.edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+body.read-only .edge-hit { pointer-events: none; }
+
 .union-mark { fill: var(--gold); opacity: .85; }
+.union-mark.cross-gen { fill: #a8917a; }
 .guide {
   stroke: var(--rose);
   stroke-width: 1;
@@ -353,6 +375,17 @@ body.read-only .card { cursor: pointer; }
 .pill button:hover { background: #f1e8d6; }
 .pill button.danger:hover { background: #f6e2e0; color: #8f3f3a; }
 .pill-sep { width: 1px; height: 18px; background: var(--line-soft); margin: 0 3px; }
+
+.edge-pill { transform: translate(-50%, -50%); }
+.edge-label {
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ------------------------------------------------------------- statusbar */
 

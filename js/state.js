@@ -423,14 +423,61 @@
     });
   };
 
+  // --- removing a single relationship (the lines on the canvas) -----------
+
+  /* Break up a couple. If they had children the union survives with the first
+     partner, so the children keep a parent rather than being orphaned. */
+  FT.dissolveUnion = function (unionId) {
+    const u = FT.state.unions[unionId];
+    if (!u) return false;
+    if (u.children.length && u.partners.length >= 2) u.partners = [u.partners[0]];
+    else delete FT.state.unions[unionId];
+    return true;
+  };
+
+  /* Detach one child from its parents. The person stays on the canvas. */
+  FT.detachChild = function (unionId, childId) {
+    const u = FT.state.unions[unionId];
+    if (!u) return false;
+    u.children = u.children.filter(function (c) {
+      return c !== childId;
+    });
+    if (!u.children.length && u.partners.length < 2) delete FT.state.unions[unionId];
+    return true;
+  };
+
+  FT.edgeLabel = function (sel) {
+    const u = sel && FT.state.unions[sel.unionId];
+    if (!u) return '';
+    const name = function (id) {
+      return (FT.state.people[id] || {}).name || 'someone';
+    };
+    if (sel.kind === 'partner') return name(u.partners[0]) + ' & ' + name(u.partners[1]);
+    return name(sel.childId) + ' · child';
+  };
+
+  /* Could this person stand as a parent to all of these children? No, if they
+     are one of them or descend from one — that would make someone their own
+     ancestor. */
+  function couldParent(pid, children) {
+    return children.every(function (c) {
+      return c !== pid && !FT.isDescendant(pid, c);
+    });
+  }
+
   FT.linkAsPartners = function (aId, bId) {
     if (aId === bId || !FT.state.people[aId] || !FT.state.people[bId]) return false;
     const already = FT.unionsOf(aId).some(function (u) {
       return u.partners.indexOf(bId) >= 0;
     });
     if (already) return false;
+
+    // Joining a union with a free seat also makes this person a parent of its
+    // children — right for a single parent gaining a partner, wrong when those
+    // children are the new partner's own ancestors. In that case record the
+    // partnership on its own instead of rewriting anyone's parentage.
     const open = FT.unionsOf(aId).find(function (u) {
-      return u.partners.length < 2;
+      return u.partners.length < 2 && couldParent(bId, u.children);
     });
     if (open) open.partners.push(bId);
     else {
@@ -462,20 +509,25 @@
 
   /* Is `maybeDescendant` somewhere below `pid`? Guards against cyclic links. */
   FT.isDescendant = function (maybeDescendant, pid) {
+    if (maybeDescendant === pid) return false;
     const seen = {};
-    const queue = [pid];
+    const queue = FT.childrenOf(pid);
     while (queue.length) {
       const cur = queue.shift();
       if (seen[cur]) continue;
       seen[cur] = true;
-      if (cur === maybeDescendant && cur !== pid) return true;
+      if (cur === maybeDescendant) return true;
       FT.childrenOf(cur).forEach(function (c) {
-        if (c === maybeDescendant) queue.unshift(c);
-        else queue.push(c);
+        queue.push(c);
       });
-      if (seen[maybeDescendant]) return true;
     }
-    return !!seen[maybeDescendant] && maybeDescendant !== pid;
+    return false;
+  };
+
+  /* True when one of these two is an ancestor of the other. Such a couple can
+     never share a generation row, which the layout has to know about. */
+  FT.ancestrallyRelated = function (a, b) {
+    return a === b || FT.isDescendant(a, b) || FT.isDescendant(b, a);
   };
 
   // --- demo document ------------------------------------------------------

@@ -30,6 +30,7 @@
       FT.state = doc;
       FT.readOnly = !!readOnly;
       FT.selected = null;
+      FT.selectedEdge = null;
     });
     document.body.classList.toggle('read-only', FT.readOnly);
     banner.hidden = !FT.readOnly;
@@ -98,6 +99,40 @@
       FT.select(null);
       FT.save();
       FT.render();
+    },
+    /* Delete a single relationship line. Spelling out the consequence matters:
+       breaking up a couple who have children is not obviously reversible. */
+    removeEdge: function () {
+      const sel = FT.selectedEdge;
+      if (!sel || FT.readOnly) return;
+      const u = FT.state.unions[sel.unionId];
+      if (!u) return;
+      const nameOf = function (id) {
+        return (FT.state.people[id] || {}).name || 'someone';
+      };
+
+      let msg;
+      if (sel.kind === 'partner') {
+        const a = nameOf(u.partners[0]);
+        const b = nameOf(u.partners[1]);
+        const n = u.children.length;
+        msg = n
+          ? 'Separate ' + a + ' and ' + b + '? Their ' +
+            (n === 1 ? 'child stays' : n + ' children stay') + ' with ' + a + '.'
+          : 'Separate ' + a + ' and ' + b + '?';
+      } else {
+        msg = 'Detach ' + nameOf(sel.childId) +
+          ' from their parents? They stay on the canvas.';
+      }
+      if (!confirm(msg)) return;
+
+      FT.checkpoint();
+      if (sel.kind === 'partner') FT.dissolveUnion(sel.unionId);
+      else FT.detachChild(sel.unionId, sel.childId);
+      FT.selectedEdge = null;
+      FT.save();
+      FT.render();
+      FT.emit('hint', { text: 'Link removed.' });
     },
     arrange: function () {
       FT.checkpoint();
@@ -178,7 +213,7 @@
     if (e.key === 'Escape') {
       if (FT.isBookOpen()) FT.closeBook();
       else if (!document.getElementById('shareDialog').hidden) FT.closeShare();
-      else FT.select(null);
+      else FT.select(null); // also clears any selected line
       return;
     }
 
@@ -195,9 +230,11 @@
     if (e.key === 'Enter' && FT.selected) {
       e.preventDefault();
       FT.openBook(FT.selected);
-    } else if ((e.key === 'Delete' || e.key === 'Backspace') && FT.selected) {
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (!FT.selectedEdge && !FT.selected) return;
       e.preventDefault();
-      actions.remove();
+      if (FT.selectedEdge) actions.removeEdge();
+      else actions.remove();
     } else if (e.key.toLowerCase() === 'a') {
       actions.arrange();
     } else if (e.key.toLowerCase() === 'n') {
