@@ -1,0 +1,6 @@
+# Share snapshots written by server.js — these are people's family data, not code.
+shares/
+
+node_modules/
+*.log
+.DS_Store

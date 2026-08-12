@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heirloom — Family Tree</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <path d="M12 21V11M12 11a4 4 0 0 1 4-4h3M12 11a4 4 0 0 0-4-4H5"
+            fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      <circle cx="12" cy="21" r="1.6" fill="currentColor"/>
+      <circle cx="19.5" cy="7" r="1.6" fill="currentColor"/>
+      <circle cx="4.5" cy="7" r="1.6" fill="currentColor"/>
+    </svg>
+    <span>Heirloom</span>
+  </div>
+
+  <input id="treeTitle" class="tree-title" aria-label="Family tree name" value="Our Family">
+
+  <div class="tools">
+    <div class="tool-group edit-only">
+      <button class="btn" data-action="add" title="Add a person (N)">+ Person</button>
+      <button class="btn" data-action="arrange" title="Tidy into generations (A)">Tidy up</button>
+    </div>
+    <div class="tool-group">
+      <button class="btn icon" data-action="zoomOut" title="Zoom out" aria-label="Zoom out">&minus;</button>
+      <button class="btn icon" data-action="fit" title="Fit to screen (F)" aria-label="Fit to screen">&#9974;</button>
+      <button class="btn icon" data-action="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
+    </div>
+    <div class="tool-group">
+      <button class="btn" data-action="import" title="Open a .json family tree">Import</button>
+      <button class="btn" data-action="export" title="Download this tree as .json">Export</button>
+      <button class="btn primary" data-action="share">Share</button>
+    </div>
+  </div>
+</header>
+
+<div id="roBanner" class="ro-banner" hidden>
+  <span>You are looking at a shared family tree. It is read-only.</span>
+  <button class="btn small" data-action="copyToMine">Make a copy I can edit</button>
+</div>
+
+<main id="stage" class="stage">
+  <div id="viewport" class="viewport">
+    <svg id="edges" class="edges" aria-hidden="true"></svg>
+    <svg id="guides" class="guides" aria-hidden="true"></svg>
+    <div id="nodes" class="nodes"></div>
+  </div>
+</main>
+
+<!-- Floating actions for the selected card -->
+<div id="pill" class="pill" hidden>
+  <button data-action="parent" title="Add a parent above">+ Parent</button>
+  <button data-action="partner" title="Add a partner beside">+ Partner</button>
+  <button data-action="child" title="Add a child below">+ Child</button>
+  <span class="pill-sep"></span>
+  <button data-action="linkPartner" title="Join to an existing person as partners">Link&nbsp;partner</button>
+  <button data-action="linkChild" title="Attach an existing person as a child">Link&nbsp;child</button>
+  <span class="pill-sep"></span>
+  <button data-action="book" title="Open life book (Enter)">Book</button>
+  <button data-action="remove" class="danger" title="Remove from tree (Del)">Remove</button>
+</div>
+
+<div id="hint" class="hint" role="status" aria-live="polite"></div>
+
+<footer class="statusbar">
+  <span class="legend"><i class="swatch f"></i>woman <i class="swatch m"></i>man <i class="swatch x"></i>unspecified</span>
+  <span class="tips">Drag to move &middot; cards snap to the grid and to each other &middot; drop a photo on a card &middot; Ctrl+scroll to zoom</span>
+  <button class="btn small ghost" data-action="demo">Sample family</button>
+  <button class="btn small ghost edit-only" data-action="reset">Start fresh</button>
+</footer>
+
+<!-- ---------------------------------------------------------------- book -->
+<div id="bookOverlay" class="book-overlay" hidden>
+  <div class="book" role="dialog" aria-modal="true" aria-label="Life book">
+    <button id="closeBook" class="close-book" aria-label="Close book">&times;</button>
+    <div class="page page-left" id="pageLeft"></div>
+    <div class="spine" aria-hidden="true"></div>
+    <div class="page page-right" id="pageRight"></div>
+  </div>
+</div>
+
+<!-- --------------------------------------------------------------- share -->
+<div id="shareDialog" class="dialog-overlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <h2 id="shareTitle">Share this family tree</h2>
+    <p class="dialog-sub">Anyone with the link can read the tree and every life book in it. They cannot change yours.</p>
+    <div class="link-row">
+      <input id="shareLink" class="link-box" readonly aria-label="Share link">
+      <button id="copyLink" class="btn primary">Copy link</button>
+    </div>
+    <label id="photoToggleRow" class="photo-toggle" hidden>
+      <input type="checkbox" id="includePhotos" checked>
+      <span>Include photos <span id="photoCost" class="photo-cost"></span></span>
+    </label>
+    <div id="shareSpinner" class="spinner" hidden></div>
+    <p id="shareNote" class="dialog-note"></p>
+    <div class="dialog-foot">
+      <button class="btn" data-action="export">Download a copy instead</button>
+      <button id="closeShare" class="btn ghost">Done</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<script src="js/state.js"></script>
+<script src="js/photo.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/tree.js"></script>
+<script src="js/book.js"></script>
+<script src="js/share.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
