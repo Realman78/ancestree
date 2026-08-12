@@ -23,6 +23,13 @@
 
 * { box-sizing: border-box; }
 
+/* The browser's own `[hidden] { display: none }` lives in the UA stylesheet, and
+   ANY author `display` beats it — origin wins over specificity. Several
+   components below set display: flex/grid, which silently resurrects them when
+   hidden: the overlays then cover the page at opacity 0 and eat every click.
+   Keep this rule, and keep it !important. */
+[hidden] { display: none !important; }
+
 html, body {
   height: 100%;
   margin: 0;
@@ -113,7 +120,17 @@ body.read-only .edit-only { display: none; }
 }
 .btn.primary:hover { background: linear-gradient(180deg, #a86e47, #7c4d31); }
 .btn.primary:disabled { opacity: .55; cursor: default; }
-.btn.icon { padding: 7px 10px; min-width: 34px; font-size: 14px; line-height: 1; }
+/* inline-grid so a glyph and an inline SVG centre identically */
+.btn.icon {
+  display: inline-grid;
+  place-items: center;
+  padding: 7px 10px;
+  min-width: 34px;
+  height: 32px;
+  font-size: 14px;
+  line-height: 1;
+}
+.btn.icon svg { display: block; }
 .btn.small { font-size: 12px; padding: 5px 10px; }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--ink-soft); }
 .btn.ghost:hover { border-color: var(--line); color: var(--ink); box-shadow: none; }
