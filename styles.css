@@ -594,16 +594,44 @@ input.person-name:focus { outline: none; border-bottom-color: var(--gold); }
 .pf-input::placeholder { color: #c3b8a5; }
 
 /* Born / Died date pickers */
-.pf-datewrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pf-datewrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .pf-datepick { flex: 0 1 auto; font-variant-numeric: tabular-nums; }
+.pf-datetext { flex: 1 1 auto; min-width: 0; font-style: italic; }
 .pf-legacy {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   font-size: 11.5px;
   color: var(--ink-faint);
   font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-bottom: 1px dotted var(--line);
   cursor: help;
 }
+
+/* Switch a date field between the picker and free text. */
+.date-mode {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s, color .15s, border-color .15s;
+}
+.pf:hover .date-mode,
+.date-mode:focus-visible { opacity: 1; }
+.date-mode:hover { color: var(--walnut); border-color: var(--line); background: #fffdf7; }
 
 /* "Known for": two lines, then ellipsis, with the full text on hover. */
 .pf.pf-tall { align-items: start; }

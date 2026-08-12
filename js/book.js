@@ -10,6 +10,14 @@
   let personId = null;
   let entryId = null;
   let saveTimer = null;
+  let dateModes = {}; // per-field override of the picker/free-text choice
+
+  /* Which control to show for Born/Died: whatever the reader last asked for,
+     otherwise inferred from the value itself. */
+  function dateModeFor(key, value) {
+    if (dateModes[key]) return dateModes[key];
+    return value && !FT.isIsoDate(value) ? 'text' : 'pick';
+  }
 
   function person() {
     return FT.state.people[personId] || null;
@@ -116,9 +124,10 @@
       );
     };
 
-    /* A real date picker. Anything already stored that is not a full date —
-       a bare year from before this was a picker — is kept and shown beside it
-       rather than silently vanishing into an empty input. */
+    /* Born/Died offer a date picker, with a free-text escape hatch for the
+       approximate dates genealogy is full of ("c. 1880", "spring 1943"). The
+       mode follows the value — anything that is not a full date is shown as
+       text — and the toggle overrides that for as long as the book is open. */
     const dateField = function (label, key, value) {
       const iso = FT.isIsoDate(value) ? value : '';
       const legacy = !iso && value ? value : '';
@@ -130,17 +139,40 @@
           '<span class="pf-value">' + FT.escapeHtml(shown) + '</span></div>'
         );
       }
+
+      const mode = dateModeFor(key, value);
+      const toggle =
+        mode === 'pick'
+          ? '<button type="button" class="date-mode" data-key="' + key + '" data-to="text" ' +
+            'title="Enter an approximate date instead — c. 1880, spring 1943, before 1920" ' +
+            'aria-label="Enter an approximate date instead">≈</button>'
+          : '<button type="button" class="date-mode" data-key="' + key + '" data-to="pick" ' +
+            'title="Use a date picker instead" aria-label="Use a date picker instead">' +
+            '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">' +
+              '<rect x="2" y="3.5" width="12" height="10" rx="1.5" fill="none" ' +
+                'stroke="currentColor" stroke-width="1.4"/>' +
+              '<path d="M2 6.5h12M5.5 2v3M10.5 2v3" stroke="currentColor" ' +
+                'stroke-width="1.4" stroke-linecap="round"/>' +
+            '</svg></button>';
+
+      const control =
+        mode === 'pick'
+          ? '<input type="date" class="pf-input pf-datepick" data-field="' + key +
+              '" value="' + iso + '" aria-label="' + label + '">' +
+            (legacy
+              ? '<span class="pf-legacy" title="The approximate date recorded here. ' +
+                'Pick a date to replace it, or switch back to text to edit it.">was ' +
+                FT.escapeHtml(legacy) + '</span>'
+              : '')
+          : '<input type="text" class="pf-input pf-datetext" data-field="' + key +
+            '" value="' + FT.escapeHtml(value) + '" placeholder="c. 1880" aria-label="' +
+            label + ' (approximate)">';
+
+      // A div, not a label: a button inside a label forwards its click to the
+      // labelled control, which would pop the date picker open on every toggle.
       return (
-        '<label class="pf"><span class="pf-label">' + label + '</span>' +
-        '<span class="pf-datewrap">' +
-          '<input type="date" class="pf-input pf-datepick" data-field="' + key +
-            '" value="' + iso + '">' +
-          (legacy
-            ? '<span class="pf-legacy" title="Recorded as free text before this ' +
-              'was a date picker. Pick a date to replace it.">' +
-              FT.escapeHtml(legacy) + '</span>'
-            : '') +
-        '</span></label>'
+        '<div class="pf"><span class="pf-label">' + label + '</span>' +
+        '<span class="pf-datewrap">' + control + toggle + '</span></div>'
       );
     };
 
@@ -335,6 +367,7 @@
   FT.openBook = function (id) {
     if (!FT.state.people[id]) return;
     personId = id;
+    dateModes = {}; // each person starts from what their own dates imply
     const entries = sortedEntries(FT.state.people[id]);
     entryId = entries.length ? entries[entries.length - 1].id : null;
     overlay.hidden = false;
@@ -425,6 +458,15 @@
     const clamp = e.target.closest('.pf-clampwrap.editable');
     if (clamp) {
       openNoteEditor(clamp);
+      return;
+    }
+    // Swap a date field between the picker and free text.
+    const mode = e.target.closest('.date-mode');
+    if (mode) {
+      dateModes[mode.dataset.key] = mode.dataset.to;
+      renderLeft();
+      const field = leftPage.querySelector('[data-field="' + mode.dataset.key + '"]');
+      if (field) field.focus();
       return;
     }
     if (e.target.closest('#deleteEntry')) {

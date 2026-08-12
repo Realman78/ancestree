@@ -44,9 +44,17 @@ The left page is who they were and a table of contents; the right page is the
 open chapter, on ruled paper, which you just type into. It saves as you write.
 The badge on a card counts the chapters in their book.
 
-Born and Died are date pickers. Cards still show only years (`1921 – 1998`) so
-they stay readable. "Known for" is two lines; anything longer is cut with an
-ellipsis and shown in full when you hover it — click to edit.
+Born and Died are date pickers, with a `≈` button beside each (it appears when
+you hover the row) that swaps in a plain text box for the dates genealogy is
+actually made of — `c. 1880`, `spring 1943`, `before the war`. The field
+remembers which kind it is by looking at the value, so an approximate date stays
+editable as text next time you open the book. Switching back to the picker never
+discards what you wrote: it cannot display `c. 1880`, so it shows it alongside as
+`was c. 1880` until you pick a real date. Cards show only years (`1921 – 1998`),
+pulled out of either form.
+
+"Known for" is two lines; anything longer is cut with an ellipsis and shown in
+full when you hover it — click to edit.
 
 A chapter has a start date and, if you want one, an **end date** — press
 "+ end date" for anything that covers a stretch rather than a day. The contents
@@ -105,10 +113,9 @@ test/             npm test — five jsdom suites plus a real-browser pass
 - **Browser storage is finite** (a few MB). A tree with many photos can reach
   it; the app now says so plainly instead of failing quietly, but the fix is to
   Export.
-- **Dates must now be exact.** Born/Died are date pickers, so approximate dates
-  (`c. 1880`, `spring 1943`) can no longer be entered — a real limitation for
-  genealogy. Anything already recorded as free text is kept and shown beside the
-  picker rather than dropped, and picking a date replaces it.
+- **Approximate dates are text, not data.** `c. 1880` is stored as typed, and
+  nothing sorts or reasons about it beyond pulling a four-digit year out for the
+  card. Chapter dates are still exact-only.
 - Undo covers the last 60 edits and is not persisted across a reload.
 
 ## Tests

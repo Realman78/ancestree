@@ -110,18 +110,47 @@ module.exports = async function (t, h) {
     const dates = await page.locator('.card').filter({ hasText: 'Josip' }).locator('.dates').textContent();
     t.ok(dates.trim() === '1922 – 1998', 'the card still shows years only (' + dates.trim() + ')');
 
-    t.section('legacy free-text dates are not lost');
-    await page.evaluate((id) => {
-      FT.state.people[id].birth = 'c. 1880';
-      FT.openBook(id);
-    }, josip);
+    t.section('free-text escape hatch for approximate dates');
+    const birthField = '[data-field="birth"]';
+    const birthToggle = '.date-mode[data-key="birth"]';
+    await page.evaluate((id) => FT.openBook(id), josip);
     await page.waitForTimeout(400);
-    t.ok((await page.inputValue('[data-field="birth"]')) === '', 'the picker cannot show it, so it sits empty');
-    t.ok(await page.locator('.pf-legacy').isVisible(), 'and the original text is shown beside it rather than dropped');
-    t.ok((await page.locator('.pf-legacy').textContent()).includes('c. 1880'), 'showing the value verbatim');
-    await page.fill('[data-field="birth"]', '1880-01-01');
+    t.ok((await page.getAttribute(birthField, 'type')) === 'date', 'an exact date shows the picker');
+    t.ok((await page.getAttribute(birthToggle, 'data-to')) === 'text', 'with a toggle out to free text');
+
+    await page.locator(birthToggle).click();
+    await page.waitForTimeout(400);
+    t.ok((await page.getAttribute(birthField, 'type')) === 'text', 'the toggle swaps in a text field');
+    await page.fill(birthField, 'c. 1880');
+    await page.waitForTimeout(500);
+    t.ok((await page.evaluate((id) => FT.state.people[id].birth, josip)) === 'c. 1880', 'an approximate date is stored verbatim');
+
+    await page.click('#closeBook');
+    await page.waitForTimeout(400);
+    const approx = await page.locator('.card').filter({ hasText: 'Josip' }).locator('.dates').textContent();
+    t.ok(approx.trim().startsWith('1880'), 'the card still finds the year in it (' + approx.trim() + ')');
+
+    await page.evaluate((id) => FT.openBook(id), josip);
+    await page.waitForTimeout(400);
+    t.ok((await page.getAttribute(birthField, 'type')) === 'text', 'reopening keeps it as text — the mode follows the value');
+    t.ok((await page.inputValue(birthField)) === 'c. 1880', 'and it is editable, not stranded');
+
+    await page.locator(birthToggle).click();
+    await page.waitForTimeout(400);
+    t.ok((await page.getAttribute(birthField, 'type')) === 'date', 'switching back gives the picker');
+    t.ok((await page.inputValue(birthField)) === '', 'which cannot display an approximate date, so it sits empty');
+    t.ok(await page.locator('.pf-legacy').isVisible(), 'so the approximate value is shown beside it rather than dropped');
+    t.ok((await page.locator('.pf-legacy').textContent()).includes('c. 1880'), 'verbatim');
+    t.ok((await page.evaluate((id) => FT.state.people[id].birth, josip)) === 'c. 1880', 'and is still what is stored');
+    await page.fill(birthField, '1880-01-01');
     await page.waitForTimeout(400);
     t.ok(!(await page.locator('.pf-legacy').isVisible()), 'picking a date replaces it');
+    t.ok((await page.evaluate((id) => FT.state.people[id].birth, josip)) === '1880-01-01', 'and overwrites the stored value');
+
+    t.ok(
+      (await page.getAttribute('.date-mode[data-key="death"]', 'data-to')) !== null,
+      'Died has the same escape hatch'
+    );
 
     t.section('"Known for": two lines, ellipsis, tooltip');
     const short = 'Village blacksmith';
