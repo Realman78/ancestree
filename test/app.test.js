@@ -41,6 +41,51 @@ module.exports = async function (t, h) {
   $('#pill [data-action="parent"]').click();
   t.ok(Object.keys(FT.state.people).length === n, 'refuses a third parent');
 
+  t.section('deleting works when the browser blocks dialogs');
+  // The reported bug: confirm() returns false in a browser with dialogs
+  // suppressed, so every gated action silently did nothing.
+  const doomed = FT.addPerson({ name: 'Doomed Soul', x: 0, y: 0 });
+  FT.render();
+  FT.select(doomed.id);
+  $('#pill [data-action="remove"]').click();
+  t.ok(!FT.state.people[doomed.id], 'a person is removed without a confirmation dialog');
+  t.ok(w.__confirmCalls === 0, 'confirm() is never called');
+  t.ok(!$('#hintUndo').hidden, 'and the toast offers a way back');
+  t.ok(/Removed Doomed Soul/.test($('#hintText').textContent), 'saying what went (' + $('#hintText').textContent + ')');
+
+  $('#hintUndo').click();
+  t.ok(!!FT.state.people[doomed.id], 'the toast Undo brings them back');
+  FT.select(doomed.id);
+  $('#pill [data-action="remove"]').click();
+  t.ok(!FT.state.people[doomed.id], 'removed again for the rest of the run');
+
+  t.section('the undo button');
+  t.ok($('#undoBtn').disabled === false, 'Undo is enabled once there is history');
+  $('#undoBtn').click();
+  t.ok(!!FT.state.people[doomed.id], 'the toolbar Undo works too');
+  t.ok($('#redoBtn').disabled === false, 'and Redo becomes available');
+  $('#redoBtn').click();
+  t.ok(!FT.state.people[doomed.id], 'Redo reapplies it');
+  t.ok(FT.canUndo() && !FT.canRedo(), 'history tracks both directions');
+
+  t.section('replacing the whole tree is recoverable');
+  // "Start fresh" and "Sample family" no longer ask either, so a stray click
+  // must not be the end of someone's tree.
+  const beforeReset = JSON.stringify(FT.state.people);
+  const namesBefore = Object.keys(FT.state.people).length;
+  $('[data-action="reset"]').click();
+  t.ok(Object.keys(FT.state.people).length === 1, '"Start fresh" empties the tree without asking');
+  t.ok(!$('#hintUndo').hidden, 'and offers Undo');
+  $('#hintUndo').click();
+  t.ok(Object.keys(FT.state.people).length === namesBefore, 'undo brings the whole tree back');
+  t.ok(JSON.stringify(FT.state.people) === beforeReset, 'intact, down to every person');
+
+  $('[data-action="demo"]').click();
+  t.ok(!$('#hintUndo').hidden, '"Sample family" is undoable too');
+  $('#hintUndo').click();
+  t.ok(JSON.stringify(FT.state.people) === beforeReset, 'and restores what was there');
+  t.ok(w.__confirmCalls === 0, 'still no dialogs anywhere');
+
   t.section('relationship lines are selectable and removable');
   const partnerUnion = FT.unionList().find((u) => u.partners.length === 2 && u.children.length);
   FT.selectEdge({ kind: 'partner', unionId: partnerUnion.id, childId: null });
@@ -71,6 +116,7 @@ module.exports = async function (t, h) {
 
   FT.undo();
   t.ok(!!FT.parentUnionOf(someChild), 'undo restores a removed link');
+  t.ok(w.__confirmCalls === 0, 'no dialog was used for any of it');
 
   t.section('the book');
   const josip = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Josip Kovač');

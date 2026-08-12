@@ -132,6 +132,15 @@ body.read-only .edit-only { display: none; }
 }
 .btn.icon svg { display: block; }
 .btn.small { font-size: 12px; padding: 5px 10px; }
+.btn.with-icon { display: inline-flex; align-items: center; gap: 6px; height: 32px; }
+.btn.with-icon svg { display: block; }
+.btn:disabled {
+  opacity: .4;
+  cursor: default;
+  border-color: var(--line);
+  box-shadow: none;
+}
+.btn:disabled:hover { border-color: var(--line); box-shadow: none; }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--ink-soft); }
 .btn.ghost:hover { border-color: var(--line); color: var(--ink); box-shadow: none; }
 
@@ -421,7 +430,10 @@ body.read-only .card { cursor: pointer; }
   left: 50%;
   bottom: 58px;
   transform: translate(-50%, 12px);
-  padding: 9px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px 9px 16px;
   background: #33291c;
   color: #f7efe0;
   font-size: 13px;
@@ -433,6 +445,23 @@ body.read-only .card { cursor: pointer; }
   z-index: 60;
 }
 .hint.show { opacity: 1; transform: translate(-50%, 0); }
+/* The toast itself ignores clicks; only the action inside it takes them. */
+.hint.show .hint-undo { pointer-events: auto; }
+
+.hint-undo {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  padding: 4px 12px;
+  border: 1px solid rgba(247,239,224,.35);
+  border-radius: 14px;
+  background: transparent;
+  color: #f0c987;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.hint-undo:hover { background: rgba(240,201,135,.16); border-color: #f0c987; }
 
 /* ------------------------------------------------------------------ book */
 

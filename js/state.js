@@ -139,6 +139,18 @@
 
   /* Snapshot before a mutation. Call this at the start of any user edit that
      should be undoable; consecutive drags coalesce via the `tag` argument. */
+  function historyChanged() {
+    FT.emit('history', { undo: undoStack.length, redo: redoStack.length });
+  }
+
+  FT.canUndo = function () {
+    return undoStack.length > 0;
+  };
+
+  FT.canRedo = function () {
+    return redoStack.length > 0;
+  };
+
   FT.checkpoint = function (tag) {
     if (suspended || FT.readOnly) return;
     const top = undoStack[undoStack.length - 1];
@@ -146,6 +158,7 @@
     undoStack.push({ tag: tag || null, snap: FT.clone(FT.state) });
     if (undoStack.length > 60) undoStack.shift();
     redoStack.length = 0;
+    historyChanged();
   };
 
   FT.undo = function () {
@@ -153,6 +166,7 @@
     redoStack.push({ tag: null, snap: FT.clone(FT.state) });
     FT.state = undoStack.pop().snap;
     FT.emit('change', { reason: 'undo' });
+    historyChanged();
     return true;
   };
 
@@ -161,6 +175,7 @@
     undoStack.push({ tag: null, snap: FT.clone(FT.state) });
     FT.state = redoStack.pop().snap;
     FT.emit('change', { reason: 'redo' });
+    historyChanged();
     return true;
   };
 

@@ -7,15 +7,29 @@
   const banner = document.getElementById('roBanner');
   const importInput = document.getElementById('importFile');
 
+  const hintText = document.getElementById('hintText');
+  const hintUndo = document.getElementById('hintUndo');
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+
   let hintTimer = null;
   FT.on('hint', function (payload) {
-    hint.textContent = payload.text;
+    hintText.textContent = payload.text;
+    // Destructive steps no longer ask first, so the way back has to be offered
+    // at the moment of loss, not just in the toolbar.
+    hintUndo.hidden = !payload.undo || FT.readOnly;
     hint.classList.add('show');
     clearTimeout(hintTimer);
     hintTimer = setTimeout(function () {
       hint.classList.remove('show');
-    }, 3200);
+    }, payload.undo ? 7000 : 3200);
   });
+
+  function syncHistory() {
+    undoBtn.disabled = !FT.canUndo();
+    redoBtn.disabled = !FT.canRedo();
+  }
+  FT.on('history', syncHistory);
 
   FT.on('change', function () {
     FT.resetCards();
@@ -39,6 +53,7 @@
     FT.resetCards();
     FT.render();
     FT.fitToScreen();
+    syncHistory();
     if (!FT.readOnly) FT.save();
   };
 
@@ -84,24 +99,31 @@
     book: function () {
       if (FT.selected) FT.openBook(FT.selected);
     },
+    /* Nothing here asks for confirmation. A browser that suppresses dialogs
+       makes confirm() return false, which silently swallowed the action — so
+       every destructive step is undoable instead, and says so as it happens. */
     remove: function () {
       if (!FT.selected) return;
       const p = FT.state.people[FT.selected];
       if (!p) return;
       const written = p.entries.length;
-      const msg = written
-        ? 'Remove ' + p.name + '? Their book has ' + written +
-          (written === 1 ? ' chapter' : ' chapters') + ' and will go with them.'
-        : 'Remove ' + p.name + ' from the tree?';
-      if (!confirm(msg)) return;
       FT.checkpoint();
       FT.removePerson(FT.selected);
       FT.select(null);
       FT.save();
       FT.render();
+      FT.emit('hint', {
+        text:
+          'Removed ' + p.name +
+          (written
+            ? ' and ' + (written === 1 ? 'their 1 chapter' : 'their ' + written + ' chapters')
+            : '') + '.',
+        undo: true,
+      });
     },
-    /* Delete a single relationship line. Spelling out the consequence matters:
-       breaking up a couple who have children is not obviously reversible. */
+    /* Delete a single relationship line. The consequence is reported after the
+       fact rather than asked about first — breaking up a couple who have
+       children keeps them with one parent, and people should be told which. */
     removeEdge: function () {
       const sel = FT.selectedEdge;
       if (!sel || FT.readOnly) return;
@@ -117,14 +139,12 @@
         const b = nameOf(u.partners[1]);
         const n = u.children.length;
         msg = n
-          ? 'Separate ' + a + ' and ' + b + '? Their ' +
+          ? 'Separated ' + a + ' and ' + b + '. Their ' +
             (n === 1 ? 'child stays' : n + ' children stay') + ' with ' + a + '.'
-          : 'Separate ' + a + ' and ' + b + '?';
+          : 'Separated ' + a + ' and ' + b + '.';
       } else {
-        msg = 'Detach ' + nameOf(sel.childId) +
-          ' from their parents? They stay on the canvas.';
+        msg = 'Detached ' + nameOf(sel.childId) + ' from their parents.';
       }
-      if (!confirm(msg)) return;
 
       FT.checkpoint();
       if (sel.kind === 'partner') FT.dissolveUnion(sel.unionId);
@@ -132,7 +152,15 @@
       FT.selectedEdge = null;
       FT.save();
       FT.render();
-      FT.emit('hint', { text: 'Link removed.' });
+      FT.emit('hint', { text: msg, undo: true });
+    },
+    undo: function () {
+      const done = FT.undo();
+      FT.emit('hint', { text: done ? 'Undone.' : 'Nothing to undo.' });
+    },
+    redo: function () {
+      const done = FT.redo();
+      FT.emit('hint', { text: done ? 'Redone.' : 'Nothing to redo.' });
     },
     arrange: function () {
       FT.checkpoint();
@@ -168,22 +196,26 @@
       FT.adoptDocument(copy, false);
       FT.emit('hint', { text: 'Copied into your own tree — edit away.' });
     },
+    // These two replace the whole document, so they take a checkpoint first —
+    // without it, losing a tree to a stray click would be unrecoverable.
     reset: function () {
-      if (!confirm('Start a new empty tree? Your current one will be replaced.')) return;
+      FT.checkpoint();
       FT.adoptDocument(FT.newTree('Our Family'), false);
       const p = FT.addPerson({ name: 'Me', x: 0, y: 0 });
       FT.save();
       FT.select(p.id);
       FT.fitToScreen();
+      FT.emit('hint', { text: 'Started a new tree.', undo: true });
     },
     demo: function () {
-      if (!confirm('Load the sample family? This replaces your current tree.')) return;
+      FT.checkpoint();
       const demo = FT.demoTree();
       FT.silently(function () {
         FT.state = demo;
       });
       FT.autoArrange();
       FT.adoptDocument(FT.state, false);
+      FT.emit('hint', { text: 'Loaded the sample family.', undo: true });
     },
   };
 
@@ -220,8 +252,8 @@
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
       if (typing) return; // let the browser undo the text field
       e.preventDefault();
-      const done = e.shiftKey ? FT.redo() : FT.undo();
-      FT.emit('hint', { text: done ? (e.shiftKey ? 'Redone.' : 'Undone.') : 'Nothing to undo.' });
+      if (e.shiftKey) actions.redo();
+      else actions.undo();
       return;
     }
 

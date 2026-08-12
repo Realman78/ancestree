@@ -95,7 +95,14 @@ async function loadPage(url, opts) {
       });
       // jsdom ships no fetch; real browsers do.
       w.fetch = (u, o) => globalThis.fetch(new URL(u, BASE), o);
-      w.confirm = () => true;
+      // Stand in for a browser that suppresses dialogs: confirm() returns false
+      // without asking anyone. Anything gated on it would silently do nothing,
+      // so the app must not use it at all. Counted so tests can assert that.
+      w.__confirmCalls = 0;
+      w.confirm = () => {
+        w.__confirmCalls++;
+        return false;
+      };
       w.addEventListener('error', (e) => errors.push(String((e.error && e.error.stack) || e.message)));
       w.addEventListener('unhandledrejection', (e) => errors.push('unhandled rejection: ' + e.reason));
       if (options.beforeParse) options.beforeParse(w);

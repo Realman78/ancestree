@@ -27,6 +27,26 @@
       <button class="btn" data-action="add" title="Add a person (N)">+ Person</button>
       <button class="btn" data-action="arrange" title="Tidy into generations (A)">Tidy up</button>
     </div>
+    <div class="tool-group edit-only">
+      <button class="btn with-icon" id="undoBtn" data-action="undo" title="Undo (Ctrl+Z)" disabled>
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path d="M6.5 4.5h3.25a3.25 3.25 0 0 1 0 6.5H5.5" fill="none"
+                stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M8.5 2.25 6 4.5l2.5 2.25" fill="none" stroke="currentColor"
+                stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Undo</span>
+      </button>
+      <button class="btn icon" id="redoBtn" data-action="redo" title="Redo (Ctrl+Shift+Z)"
+              aria-label="Redo" disabled>
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+          <path d="M9.5 4.5H6.25a3.25 3.25 0 0 0 0 6.5H10.5" fill="none"
+                stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M7.5 2.25 10 4.5 7.5 6.75" fill="none" stroke="currentColor"
+                stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
     <div class="tool-group">
       <button class="btn icon" data-action="zoomOut" title="Zoom out" aria-label="Zoom out">&minus;</button>
       <button class="btn icon" data-action="fit" title="Fit to screen (F)" aria-label="Fit to screen">
@@ -79,7 +99,10 @@
   <button data-action="removeEdge" class="danger" title="Remove this link (Del)">Remove link</button>
 </div>
 
-<div id="hint" class="hint" role="status" aria-live="polite"></div>
+<div id="hint" class="hint" role="status" aria-live="polite">
+  <span id="hintText"></span>
+  <button id="hintUndo" class="hint-undo" data-action="undo" hidden>Undo</button>
+</div>
 
 <footer class="statusbar">
   <span class="legend"><i class="swatch f"></i>woman <i class="swatch m"></i>man <i class="swatch x"></i>unspecified</span>

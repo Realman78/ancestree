@@ -36,9 +36,15 @@ refused.
 **The lines are relationships, and you can click them.** A selected line
 highlights along its whole route and offers **Remove link**; `Del` does the same.
 Removing a partner line separates the couple — if they had children the union
-stays with the first partner, so nobody is orphaned, and the confirmation says so
-by name. Removing a child line detaches that person from their parents and leaves
-them on the canvas. Both are undoable.
+stays with the first partner, so nobody is orphaned. Removing a child line
+detaches that person from their parents and leaves them on the canvas.
+
+**Nothing asks "are you sure".** Browsers can suppress dialogs, and a suppressed
+`confirm()` returns false, which meant deleting quietly did nothing at all.
+So every destructive step just happens, says what it did, and offers **Undo** in
+the toast right where the loss occurred — with **Undo**/**Redo** in the toolbar
+and `Ctrl+Z` / `Ctrl+Shift+Z` as well. That covers replacing the whole tree too:
+"Start fresh" and "Sample family" act immediately and are both undoable.
 
 **Partners from different generations** — someone partnered with a descendant —
 are rare but real, and are drawn as a dashed curve instead of the usual squared
@@ -133,7 +139,10 @@ test/             npm test — five jsdom suites plus a real-browser pass
 - **Approximate dates are text, not data.** `c. 1880` is stored as typed, and
   nothing sorts or reasons about it beyond pulling a four-digit year out for the
   card. Chapter dates are still exact-only.
-- Undo covers the last 60 edits and is not persisted across a reload.
+- **Undo is the only safety net, and it does not survive a reload.** Nothing is
+  confirmed before it happens, and the history is in memory only — so deleting
+  someone and then reloading makes it permanent. The 60-step limit applies too.
+  Export is the real backup.
 
 ## Tests
 

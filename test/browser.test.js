@@ -150,15 +150,23 @@ module.exports = async function (t, h) {
       window.__keeper = u.partners[0];
     });
     await page.waitForTimeout(250);
-    page.once('dialog', (dlg) => {
-      dlg.accept();
+
+    // No dialog handler is registered. Playwright auto-dismisses any dialog,
+    // which is exactly the browser-blocks-dialogs case that broke this — so if
+    // a confirm() ever comes back, these assertions fail.
+    let dialogs = 0;
+    page.on('dialog', (dlg) => {
+      dialogs++;
+      dlg.dismiss();
     });
+
     await page.keyboard.press('Delete');
     await page.waitForTimeout(400);
     t.ok(
       await page.evaluate(() => FT.state.unions[window.__u].partners.length === 1),
-      'Delete removes the selected line'
+      'Delete removes the selected line with no dialog in the way'
     );
+    t.ok(dialogs === 0, 'no dialog was shown');
     t.ok(
       await page.evaluate(() => window.__kids.every((k) => FT.parentsOf(k).includes(window.__keeper))),
       'and the children keep a parent'
@@ -166,21 +174,35 @@ module.exports = async function (t, h) {
     t.ok((await page.locator('#edges path.edge.selected').count()) === 0, 'the highlight clears');
     t.ok(!(await page.locator('#edgePill').isVisible()), 'and so does the pill');
 
-    // Cancelling must not change anything.
+    t.section('undo is offered, not assumed');
+    t.ok(await page.locator('#hintUndo').isVisible(), 'the toast carries an Undo button');
+    t.ok((await page.locator('#hintText').textContent()).startsWith('Separated'), 'and says what happened');
+    await page.click('#hintUndo');
+    await page.waitForTimeout(400);
+    t.ok(
+      await page.evaluate(() => FT.state.unions[window.__u].partners.length === 2),
+      'clicking it puts the couple back together'
+    );
+
+    t.ok(!(await page.locator('#undoBtn').isDisabled()), 'the toolbar Undo is enabled');
+    t.ok(!(await page.locator('#redoBtn').isDisabled()), 'and Redo, having just undone something');
+    await page.click('#redoBtn');
+    await page.waitForTimeout(400);
+    t.ok(
+      await page.evaluate(() => FT.state.unions[window.__u].partners.length === 1),
+      'Redo reapplies the removal'
+    );
+    await page.click('#undoBtn');
+    await page.waitForTimeout(400);
+    t.ok(
+      await page.evaluate(() => FT.state.unions[window.__u].partners.length === 2),
+      'and Undo takes it back again'
+    );
+
     await page.evaluate(() => {
       const u = FT.unionList().find((x) => x.children.length);
       FT.selectEdge({ kind: 'child', unionId: u.id, childId: u.children[0] });
-      window.__before = JSON.stringify(FT.state.unions);
     });
-    page.once('dialog', (dlg) => {
-      dlg.dismiss();
-    });
-    await page.click('#edgePill [data-action="removeEdge"]');
-    await page.waitForTimeout(400);
-    t.ok(
-      await page.evaluate(() => JSON.stringify(FT.state.unions) === window.__before),
-      'declining the confirmation changes nothing'
-    );
     await page.keyboard.press('Escape');
     await page.waitForTimeout(250);
     t.ok(await page.evaluate(() => FT.selectedEdge === null), 'Escape deselects a line');
