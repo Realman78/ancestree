@@ -3,7 +3,8 @@
 A family tree you can lay out by hand, where every person carries a diary of
 their life, and the whole thing can be handed to someone else with a link.
 
-No build step, no dependencies, no accounts.
+No build step, no accounts, and nothing to install to run it — the dependencies
+in `package.json` are only for the tests.
 
 ## Run it
 
@@ -43,6 +44,15 @@ The left page is who they were and a table of contents; the right page is the
 open chapter, on ruled paper, which you just type into. It saves as you write.
 The badge on a card counts the chapters in their book.
 
+Born and Died are date pickers. Cards still show only years (`1921 – 1998`) so
+they stay readable. "Known for" is two lines; anything longer is cut with an
+ellipsis and shown in full when you hover it — click to edit.
+
+A chapter has a start date and, if you want one, an **end date** — press
+"+ end date" for anything that covers a stretch rather than a day. The contents
+mark a spanning chapter with `→`, and an end date that falls before the start
+is refused rather than stored.
+
 **Sharing.** Press **Share** for a link. Anyone who opens it gets a read-only
 copy of the tree *and* every life book in it, with a "Make a copy I can edit"
 button if they want their own. Your tree is untouched by whatever they do.
@@ -74,6 +84,7 @@ js/tree.js        canvas: rendering, pan/zoom, dragging, snapping, guides
 js/book.js        the two-page life book
 js/share.js       link encoding, export/import, opening a shared tree
 server.js         optional zero-dependency static server + share storage
+test/             npm test — five jsdom suites plus a real-browser pass
 ```
 
 ## What a prototype this size doesn't do yet
@@ -94,15 +105,27 @@ server.js         optional zero-dependency static server + share storage
 - **Browser storage is finite** (a few MB). A tree with many photos can reach
   it; the app now says so plainly instead of failing quietly, but the fix is to
   Export.
-- **Dates are free text** (`1921`, `c. 1880` both fine) except diary entries,
-  which use a real date picker so chapters can be ordered.
+- **Dates must now be exact.** Born/Died are date pickers, so approximate dates
+  (`c. 1880`, `spring 1943`) can no longer be entered — a real limitation for
+  genealogy. Anything already recorded as free text is kept and shown beside the
+  picker rather than dropped, and picking a date replaces it.
 - Undo covers the last 60 edits and is not persisted across a reload.
 
 ## Tests
 
-There is no test runner in the project. I drove the real page in `jsdom` while
-building it — layout and overlap, relationship edits, cycle refusal, the book
-writing through to the document, read-only mode, the share round trip through
-both routes, escaping of hostile input from a shared link, photo downscaling,
-rejection of hostile image URLs, and the server's endpoints. Those scripts live
-outside the repo; say the word and I'll add them as a proper `npm test`.
+```bash
+npm install
+npx playwright install chromium   # once, for the browser suite
+npm test                          # or: npm test browser
+```
+
+Six suites, run against a real instance of the app: the document model and
+layout, share-link encoding, the wired-up page, sharing end to end, photos, and
+a real-Chromium pass.
+
+That last one earns its keep. The first five run in `jsdom`, which does no
+layout and no hit-testing — it once reported a page as fine while every click
+was being swallowed by an invisible overlay. Only the browser suite can catch
+that, so it also holds a regression test that puts the bug back and proves the
+click dies. Without Chromium installed it reports `SKIPPED` rather than
+pretending to pass.

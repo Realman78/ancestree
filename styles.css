@@ -593,6 +593,56 @@ input.person-name:focus { outline: none; border-bottom-color: var(--gold); }
 .pf-input:focus { outline: none; background: #fff; border-color: var(--gold); }
 .pf-input::placeholder { color: #c3b8a5; }
 
+/* Born / Died date pickers */
+.pf-datewrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pf-datepick { flex: 0 1 auto; font-variant-numeric: tabular-nums; }
+.pf-legacy {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  font-style: italic;
+  border-bottom: 1px dotted var(--line);
+  cursor: help;
+}
+
+/* "Known for": two lines, then ellipsis, with the full text on hover. */
+.pf.pf-tall { align-items: start; }
+.pf.pf-tall .pf-label { padding-top: 6px; }
+
+.pf-clampwrap {
+  font-size: 13.5px;
+  line-height: 1.45;
+  min-height: calc(2 * 1.45em + 10px);
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--ink);
+}
+/* The clamp itself. Must stay a plain inline child — as a grid/flex item its
+   display would be blockified and -webkit-box (which line-clamp needs) lost. */
+.pf-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-height: calc(2 * 1.45em);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pf-clampwrap.editable { cursor: text; }
+.pf-clampwrap.editable:hover { background: rgba(180,150,90,.09); }
+.pf-clampwrap.editable:focus-visible { outline: none; background: #fff; border-color: var(--gold); }
+.pf-clampwrap.empty { color: #c3b8a5; }
+
+textarea.pf-multiline {
+  font-family: inherit;
+  line-height: 1.45;
+  height: calc(2 * 1.45em + 10px);
+  resize: vertical;
+  min-height: calc(2 * 1.45em + 10px);
+}
+
 .toc-head {
   display: flex;
   align-items: center;
@@ -660,20 +710,60 @@ input.person-name:focus { outline: none; border-bottom-color: var(--gold); }
   gap: 12px;
   margin-bottom: 14px;
 }
-.entry-date, .entry-date-ro {
+.entry-date-ro {
   font-family: var(--serif);
   font-size: 13px;
   color: var(--ink-soft);
   letter-spacing: .04em;
 }
-.entry-date {
+.entry-dates {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.entry-date, .entry-end {
+  font-family: var(--serif);
+  font-size: 13px;
+  color: var(--ink-soft);
+  letter-spacing: .04em;
   border: 1px solid transparent;
   background: transparent;
   border-radius: 5px;
   padding: 4px 6px;
 }
-.entry-date:hover { background: rgba(180,150,90,.1); }
-.entry-date:focus { outline: none; background: #fff; border-color: var(--gold); }
+.entry-date:hover, .entry-end:hover { background: rgba(180,150,90,.1); }
+.entry-date:focus, .entry-end:focus { outline: none; background: #fff; border-color: var(--gold); }
+
+.date-dash { color: var(--ink-faint); font-family: var(--serif); }
+
+.date-add, .date-clear {
+  font: inherit;
+  font-family: var(--ui);
+  font-size: 11.5px;
+  padding: 3px 7px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.date-add:hover { color: var(--walnut-dk); border-color: var(--line); background: #fffdf7; }
+.date-clear { font-size: 14px; line-height: 1; padding: 2px 6px; }
+.date-clear:hover { color: #93413c; border-color: #c98f8b; background: #fdf4f3; }
+
+.entry-warn {
+  margin: -6px 0 10px;
+  font-size: 12px;
+  color: #93413c;
+  background: #fdf4f3;
+  border: 1px solid #e4c4c1;
+  border-radius: 6px;
+  padding: 5px 9px;
+}
+
+.toc-span { margin-left: 3px; color: var(--gold); font-size: 10px; }
 
 .entry-title, .entry-title-ro {
   font-family: var(--serif);

@@ -42,6 +42,12 @@
     return Number(m[3]) + ' ' + months[Number(m[2]) - 1] + ' ' + m[1];
   }
 
+  /* "2 June 1946", or "2 June 1946 – 15 September 1946" for a chapter that spans. */
+  function prettyRange(e) {
+    const start = prettyDate(e.date);
+    return e.end ? start + ' – ' + prettyDate(e.end) : start;
+  }
+
   function sortedEntries(p) {
     return p.entries.slice().sort(function (a, b) {
       return String(a.date).localeCompare(String(b.date));
@@ -110,13 +116,65 @@
       );
     };
 
+    /* A real date picker. Anything already stored that is not a full date —
+       a bare year from before this was a picker — is kept and shown beside it
+       rather than silently vanishing into an empty input. */
+    const dateField = function (label, key, value) {
+      const iso = FT.isIsoDate(value) ? value : '';
+      const legacy = !iso && value ? value : '';
+      if (ro) {
+        const shown = iso ? prettyDate(iso) : legacy;
+        if (!shown) return '';
+        return (
+          '<div class="pf"><span class="pf-label">' + label + '</span>' +
+          '<span class="pf-value">' + FT.escapeHtml(shown) + '</span></div>'
+        );
+      }
+      return (
+        '<label class="pf"><span class="pf-label">' + label + '</span>' +
+        '<span class="pf-datewrap">' +
+          '<input type="date" class="pf-input pf-datepick" data-field="' + key +
+            '" value="' + iso + '">' +
+          (legacy
+            ? '<span class="pf-legacy" title="Recorded as free text before this ' +
+              'was a date picker. Pick a date to replace it.">' +
+              FT.escapeHtml(legacy) + '</span>'
+            : '') +
+        '</span></label>'
+      );
+    };
+
+    /* Two lines, ellipsis past that, full text on hover. Editing swaps in a
+       textarea on click (see openNoteEditor) — a clamped box cannot be typed in. */
+    const clampField = function (label, key, value, placeholder) {
+      const text = String(value || '');
+      const empty = !text;
+      // The clamped span must NOT be a grid item: a grid item's display is
+      // blockified, which turns -webkit-box into flow-root and kills the clamp.
+      // Hence the wrapper.
+      return (
+        '<div class="pf pf-tall"><span class="pf-label">' + label + '</span>' +
+        '<div class="pf-clampwrap' + (ro ? '' : ' editable') + (empty ? ' empty' : '') + '"' +
+          (ro ? '' : ' data-edit="' + key + '" tabindex="0" role="textbox"') +
+          ' data-full="' + FT.escapeHtml(text) + '">' +
+          '<span class="pf-clamp">' +
+            FT.escapeHtml(empty ? (ro ? '—' : placeholder) : text) +
+          '</span>' +
+        '</div></div>'
+      );
+    };
+
     const toc = entries.length
       ? entries
           .map(function (e) {
             return (
               '<li><button class="toc-item' + (e.id === entryId ? ' current' : '') +
               '" data-entry="' + e.id + '">' +
-              '<span class="toc-date">' + FT.escapeHtml(e.date || '—') + '</span>' +
+              '<span class="toc-date" title="' + FT.escapeHtml(prettyRange(e)) + '">' +
+                FT.escapeHtml(e.date || '—') +
+                (e.end ? '<span class="toc-span" aria-label="spans to ' +
+                  FT.escapeHtml(e.end) + '">→</span>' : '') +
+              '</span>' +
               '<span class="toc-title">' +
               FT.escapeHtml(e.title || 'Untitled chapter') + '</span></button></li>'
             );
@@ -131,15 +189,50 @@
         : '<input class="person-name" data-field="name" value="' +
           FT.escapeHtml(p.name) + '" placeholder="Name">') +
       '<div class="person-fields">' +
-        field('Born', 'birth', p.birth, 'e.g. 1921') +
-        field('Died', 'death', p.death, 'blank if living') +
+        dateField('Born', 'birth', p.birth) +
+        dateField('Died', 'death', p.death) +
         field('From', 'birthplace', p.birthplace, 'Place') +
-        field('Known for', 'knownFor', p.knownFor, 'A line about them') +
+        clampField('Known for', 'knownFor', p.knownFor, 'A line or two about them') +
       '</div>' +
       '<div class="toc-head"><span>Chapters</span>' +
         (ro ? '' : '<button class="mini-btn" id="addEntry">+ New chapter</button>') +
       '</div>' +
       '<ul class="toc">' + toc + '</ul>';
+
+    markClipped();
+  }
+
+  /* Only carry a tooltip when the text is genuinely cut off — a title on every
+     field would just be noise. Measured, because it depends on the rendered width. */
+  function markClipped() {
+    leftPage.querySelectorAll('.pf-clampwrap').forEach(function (wrap) {
+      const inner = wrap.querySelector('.pf-clamp');
+      const full = wrap.dataset.full || '';
+      const clipped = !!inner && inner.scrollHeight > inner.clientHeight + 1;
+      wrap.classList.toggle('is-clipped', clipped);
+      if (clipped && full) wrap.title = full;
+      else wrap.removeAttribute('title');
+    });
+  }
+
+  /* Swap the clamped box for a textarea so it can be typed into. The textarea
+     carries data-field, so the existing input handler saves it as you type. */
+  function openNoteEditor(clamp) {
+    const p = person();
+    if (!p || FT.readOnly) return;
+    const key = clamp.dataset.edit;
+    const ta = document.createElement('textarea');
+    ta.className = 'pf-input pf-multiline';
+    ta.rows = 2;
+    ta.dataset.field = key;
+    ta.placeholder = 'A line or two about them';
+    ta.value = p[key] || '';
+    clamp.replaceWith(ta);
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    ta.addEventListener('blur', function () {
+      renderLeft(); // re-clamp and restore the tooltip
+    }, { once: true });
   }
 
   // ------------------------------------------------------------ right page
@@ -163,17 +256,33 @@
       return;
     }
 
+    // A chapter can cover a single day or a stretch of years, so the end date is
+    // optional and only appears once asked for.
+    const dates = ro
+      ? '<div class="entry-date-ro">' + FT.escapeHtml(prettyRange(e)) + '</div>'
+      : '<div class="entry-dates">' +
+          '<input type="date" class="entry-date" value="' + FT.escapeHtml(e.date) + '"' +
+            (e.end ? ' max="' + FT.escapeHtml(e.end) + '"' : '') +
+            ' aria-label="Chapter start date">' +
+          (e.end
+            ? '<span class="date-dash">–</span>' +
+              '<input type="date" class="entry-end" value="' + FT.escapeHtml(e.end) + '"' +
+                (e.date ? ' min="' + FT.escapeHtml(e.date) + '"' : '') +
+                ' aria-label="Chapter end date">' +
+              '<button class="date-clear" id="clearEnd" title="Remove the end date" ' +
+                'aria-label="Remove the end date">&times;</button>'
+            : '<button class="date-add" id="addEnd">+ end date</button>') +
+        '</div>';
+
     rightPage.innerHTML =
       '<div class="entry-head">' +
-        (ro
-          ? '<div class="entry-date-ro">' + FT.escapeHtml(prettyDate(e.date)) + '</div>'
-          : '<input type="date" class="entry-date" value="' +
-            FT.escapeHtml(e.date) + '">') +
+        dates +
         (ro
           ? ''
           : '<button class="mini-btn danger" id="deleteEntry" title="Delete this chapter">' +
             'Delete</button>') +
       '</div>' +
+      '<div class="entry-warn" id="entryWarn" hidden></div>' +
       (ro
         ? '<h3 class="entry-title-ro">' +
           FT.escapeHtml(e.title || 'Untitled chapter') + '</h3>'
@@ -187,6 +296,7 @@
 
     if (!ro) autoGrow(rightPage.querySelector('.entry-body'));
     updateWordCount();
+    checkDates();
 
     if (flip) {
       rightPage.classList.remove('flip');
@@ -199,6 +309,17 @@
     if (!ta) return;
     ta.style.height = 'auto';
     ta.style.height = Math.max(220, ta.scrollHeight) + 'px';
+  }
+
+  /* min/max on the pickers stop most of this, but a typed date can still land
+     out of order — say so rather than storing a backwards chapter silently. */
+  function checkDates() {
+    const warn = document.getElementById('entryWarn');
+    const e = entry();
+    if (!warn || !e) return;
+    const bad = !!(e.end && e.date && e.end < e.date);
+    warn.hidden = !bad;
+    warn.textContent = bad ? 'This chapter ends before it starts.' : '';
   }
 
   function updateWordCount() {
@@ -246,7 +367,7 @@
     const p = person();
     if (!p || FT.readOnly) return;
     FT.checkpoint();
-    const e = { id: FT.uid('e'), date: today(), title: '', body: '' };
+    const e = { id: FT.uid('e'), date: today(), end: '', title: '', body: '' };
     p.entries.push(e);
     entryId = e.id;
     renderLeft();
@@ -278,6 +399,34 @@
       FT.clearPhoto(personId);
       return;
     }
+    // Give the chapter an end date, starting from the day it began.
+    if (e.target.closest('#addEnd')) {
+      const cur = entry();
+      if (!cur) return;
+      FT.checkpoint();
+      cur.end = cur.date || today();
+      renderRight(false);
+      renderLeft();
+      const endEl = rightPage.querySelector('.entry-end');
+      if (endEl) endEl.focus();
+      touch();
+      return;
+    }
+    if (e.target.closest('#clearEnd')) {
+      const cur = entry();
+      if (!cur) return;
+      FT.checkpoint();
+      cur.end = '';
+      renderRight(false);
+      renderLeft();
+      touch();
+      return;
+    }
+    const clamp = e.target.closest('.pf-clampwrap.editable');
+    if (clamp) {
+      openNoteEditor(clamp);
+      return;
+    }
     if (e.target.closest('#deleteEntry')) {
       const p = person();
       const cur = entry();
@@ -292,6 +441,15 @@
       renderRight(true);
       touch();
     }
+  });
+
+  /* The clamped box is focusable, so it must open on Enter/Space too. */
+  overlay.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    const clamp = ev.target.closest && ev.target.closest('.pf-clampwrap.editable');
+    if (!clamp) return;
+    ev.preventDefault();
+    openNoteEditor(clamp);
   });
 
   overlay.addEventListener('change', function (ev) {
@@ -321,6 +479,11 @@
         const initials = leftPage.querySelector('.portrait .initials');
         if (initials) initials.textContent = FT.initials(t.value);
       }
+      // A picked date replaces the old free-text value it was shown beside.
+      if ((t.dataset.field === 'birth' || t.dataset.field === 'death') && t.value) {
+        const legacy = t.parentNode.querySelector('.pf-legacy');
+        if (legacy) legacy.remove();
+      }
       touch();
       return;
     }
@@ -342,7 +505,20 @@
     } else if (t.classList.contains('entry-date')) {
       FT.checkpoint('entry-date:' + e.id);
       e.date = t.value;
+      // Keep the end picker's floor in step without re-rendering (that would
+      // yank focus out of the field being edited).
+      const endEl = rightPage.querySelector('.entry-end');
+      if (endEl) endEl.min = e.date || '';
       renderLeft();
+      checkDates();
+      touch();
+    } else if (t.classList.contains('entry-end')) {
+      FT.checkpoint('entry-end:' + e.id);
+      e.end = t.value;
+      const startEl = rightPage.querySelector('.entry-date');
+      if (startEl) startEl.max = e.end || '';
+      renderLeft();
+      checkDates();
       touch();
     }
   });

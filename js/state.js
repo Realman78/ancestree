@@ -39,9 +39,24 @@
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
+  FT.isIsoDate = function (v) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+  };
+
+  /* Cards only have room for years. Handles both a picked date and any free
+     text left over from before Born/Died were date pickers. */
+  FT.yearOf = function (v) {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return '';
+    const iso = /^(\d{4})-\d{2}-\d{2}$/.exec(s);
+    if (iso) return iso[1];
+    const loose = /(\d{4})/.exec(s);
+    return loose ? loose[1] : s;
+  };
+
   FT.lifespan = function (p) {
-    const b = (p.birth || '').trim();
-    const d = (p.death || '').trim();
+    const b = FT.yearOf(p.birth);
+    const d = FT.yearOf(p.death);
     if (!b && !d) return '';
     if (b && d) return b + ' – ' + d;
     if (b) return b + ' –';
@@ -228,9 +243,14 @@
         y: Number.isFinite(p.y) ? p.y : 0,
         entries: Array.isArray(p.entries)
           ? p.entries.map(function (e) {
+              const start = String((e && e.date) || '');
+              let end = String((e && e.end) || '');
+              // A chapter that ends before it starts is meaningless; drop the end.
+              if (end && start && end < start) end = '';
               return {
                 id: (e && e.id) || FT.uid('e'),
-                date: String((e && e.date) || ''),
+                date: start,
+                end: end,
                 title: String((e && e.title) || ''),
                 body: String((e && e.body) || ''),
               };
@@ -482,7 +502,7 @@
       return u;
     };
 
-    const josip = mk('Josip Kovač', 'm', '1921', '1998', {
+    const josip = mk('Josip Kovač', 'm', '1921-03-14', '1998-11-02', {
       birthplace: 'Sinj, Croatia',
       knownFor: 'Village blacksmith for forty years',
     });
@@ -508,7 +528,7 @@
       },
     ];
 
-    const ana = mk('Ana Kovač', 'f', '1925', '2004', {
+    const ana = mk('Ana Kovač', 'f', '1925-07-21', '2004-02-16', {
       birthplace: 'Trilj, Croatia',
       knownFor: 'Kept the village school open through two hard winters',
     });
@@ -523,7 +543,7 @@
       },
     ];
 
-    const marko = mk('Marko Kovač', 'm', '1953', '', {
+    const marko = mk('Marko Kovač', 'm', '1953-09-19', '', {
       birthplace: 'Sinj, Croatia',
       knownFor: 'First in the family to go to university',
     });
@@ -539,15 +559,15 @@
       },
     ];
 
-    const vera = mk('Vera Kovač', 'f', '1956', '', { birthplace: 'Split, Croatia' });
-    const ivana = mk('Ivana Kovač', 'f', '1958', '', {
+    const vera = mk('Vera Kovač', 'f', '1956-05-08', '', { birthplace: 'Split, Croatia' });
+    const ivana = mk('Ivana Kovač', 'f', '1958-01-30', '', {
       birthplace: 'Sinj, Croatia',
       knownFor: 'Sailed the Adriatic single-handed at nineteen',
     });
-    const luka = mk('Luka Marić', 'm', '1955', '', {});
-    const petra = mk('Petra Kovač', 'f', '1982', '', { birthplace: 'Zagreb, Croatia' });
-    const tomo = mk('Tomislav Kovač', 'm', '1985', '', { birthplace: 'Zagreb, Croatia' });
-    const nina = mk('Nina Marić', 'f', '1984', '', {});
+    const luka = mk('Luka Marić', 'm', '1955-10-12', '', {});
+    const petra = mk('Petra Kovač', 'f', '1982-04-03', '', { birthplace: 'Zagreb, Croatia' });
+    const tomo = mk('Tomislav Kovač', 'm', '1985-08-27', '', { birthplace: 'Zagreb, Croatia' });
+    const nina = mk('Nina Marić', 'f', '1984-06-15', '', {});
 
     union([josip, ana], [marko, ivana]);
     union([marko, vera], [petra, tomo]);

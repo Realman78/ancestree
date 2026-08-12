@@ -1,0 +1,18 @@
+{
+  "name": "heirloom",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A family tree where every person carries a diary of their life, shareable by link.",
+  "license": "MIT",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/run.js",
+    "test:browser": "node test/run.js browser",
+    "postinstall": "node -e \"console.log('\\n  Browser tests need Chromium once:  npx playwright install chromium\\n')\""
+  },
+  "devDependencies": {
+    "canvas": "^3.2.0",
+    "jsdom": "^28.0.0",
+    "playwright": "^1.57.0"
+  }
+}
