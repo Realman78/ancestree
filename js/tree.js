@@ -176,6 +176,30 @@
     const CARD_H = lay.cardH || FT.CARD_H;
     const out = [];
 
+    /* Two families from the same parent would otherwise drop onto one bus at
+       the same depth and read as a single set of siblings. Give each union its
+       own depth, ordered by when it began. */
+    const depth = {};
+    Object.keys(FT.state.people).forEach(function (pid) {
+      FT.sortUnions(FT.unionsOf(pid)).forEach(function (u, i) {
+        depth[u.id] = Math.max(depth[u.id] || 0, i);
+      });
+    });
+
+    /* Is another card parked between these two? Then a straight bar between
+       them would pass behind it, and the pair would look unrelated while the
+       card in the middle looked married to one of them. */
+    const blocked = function (leftP, rightP) {
+      const x1 = leftP.x + CARD_W;
+      const x2 = rightP.x;
+      return Object.keys(people).some(function (id) {
+        const q = people[id];
+        if (q === leftP || q === rightP) return false;
+        if (Math.abs(q.y - leftP.y) >= CARD_H) return false;
+        return q.x + CARD_W > x1 && q.x < x2;
+      });
+    };
+
     FT.unionList().forEach(function (u) {
       const partners = u.partners
         .map(function (id) {
@@ -185,6 +209,7 @@
       if (!partners.length) return;
 
       let anchorX, anchorY;
+      let labelY = 0;
       let crossGen = false;
 
       if (partners.length >= 2) {
@@ -212,24 +237,35 @@
           // endpoints at t=0.5.
           anchorX = (sx + ex) / 2;
           anchorY = (sy + ey) / 2;
-        } else if (x2 > x1) {
+          labelY = anchorY - 12;
+        } else if (x2 > x1 && !blocked(leftP, rightP)) {
           d = 'M' + x1 + ' ' + (leftP.y + CARD_H / 2) +
               'H' + (x1 + x2) / 2 + 'V' + midY +
               'H' + x2 + 'V' + (rightP.y + CARD_H / 2);
           anchorX = (a.x + b.x) / 2 + CARD_W / 2;
           anchorY = midY;
+          // Beside the line there is only the gap between two cards, and the
+          // edges are painted behind them — so anything longer than that gets
+          // clipped. Caption it in the open space just below instead.
+          labelY = Math.max(a.y, b.y) + CARD_H + 15;
         } else {
-          // Cards overlap horizontally — the bar would run backwards, so route
-          // it underneath both instead.
+          // Either the cards overlap (the bar would run backwards) or somebody
+          // is sitting between them. Take the connector under the row so it
+          // visibly goes around rather than hiding behind.
+          const underY =
+            Math.max(a.y, b.y) + CARD_H + 26 + (depth[u.id] || 0) * 14;
           d = 'M' + (leftP.x + CARD_W / 2) + ' ' + (leftP.y + CARD_H) +
-              'V' + (Math.max(a.y, b.y) + CARD_H + 24) +
+              'V' + underY +
               'H' + (rightP.x + CARD_W / 2) + 'V' + (rightP.y + CARD_H);
-          anchorX = (a.x + b.x) / 2 + CARD_W / 2;
-          anchorY = midY;
+          anchorX = (leftP.x + rightP.x) / 2 + CARD_W / 2;
+          anchorY = underY;
+          labelY = underY + 15;
         }
 
         out.push({
           kind: 'partner', unionId: u.id, childId: null, d: d, crossGen: crossGen,
+          status: u.status, label: FT.unionLabel(u),
+          labelPos: { x: anchorX, y: labelY },
           mark: { x: anchorX, y: anchorY }, mid: { x: anchorX, y: anchorY },
         });
       } else {
@@ -245,7 +281,10 @@
       if (!children.length) return;
 
       const topChildY = Math.min.apply(null, children.map(function (c) { return c.y; }));
-      const busY = Math.max(anchorY + 40, topChildY - 40);
+      // Each union's children ride their own bus, so two families from one
+      // parent stay visibly separate.
+      const lift = (depth[u.id] || 0) * 18;
+      const busY = Math.max(anchorY + 28, topChildY - 40 - lift);
 
       children.forEach(function (c) {
         const cx = c.x + CARD_W / 2;
@@ -254,6 +293,8 @@
           unionId: u.id,
           childId: c.id,
           crossGen: false,
+          status: u.status,
+          label: '',
           mark: null,
           d: 'M' + anchorX + ' ' + anchorY + 'V' + busY + 'H' + cx + 'V' + c.y,
           mid: { x: (anchorX + cx) / 2, y: busY },
@@ -270,31 +311,53 @@
     const marks = [];
     edgeMids = {};
 
+    const labels = [];
+
     FT.edgeGeometry().forEach(function (e) {
       const attrs =
         ' data-kind="' + e.kind + '" data-union="' + e.unionId + '"' +
         (e.childId ? ' data-child="' + e.childId + '"' : '');
       const cls =
         'edge' + (e.crossGen ? ' cross-gen' : '') +
+        (e.status === 'partners' ? ' unwed' : '') +
         (isEdgeSelected(e.kind, e.unionId, e.childId) ? ' selected' : '');
       visible.push('<path class="' + cls + '"' + attrs + ' d="' + e.d + '"/>');
       hits.push('<path class="edge-hit"' + attrs + ' d="' + e.d + '"/>');
       edgeMids[edgeKey(e.kind, e.unionId, e.childId)] = e.mid;
-      if (e.mark) marks.push({ x: e.mark.x, y: e.mark.y, crossGen: e.crossGen });
+      if (e.mark) {
+        marks.push({
+          x: e.mark.x, y: e.mark.y, crossGen: e.crossGen, status: e.status,
+        });
+      }
+      if (e.label && e.labelPos) {
+        labels.push(
+          '<text class="union-label" x="' + e.labelPos.x + '" y="' + e.labelPos.y +
+            '" text-anchor="middle">' + FT.escapeHtml(e.label) + '</text>'
+        );
+      }
     });
 
     const markSvg = marks.map(function (m) {
-      return (
+      let svg =
         '<path class="union-mark' + (m.crossGen ? ' cross-gen' : '') +
         '" d="M' + m.x + ' ' + (m.y - 6) +
         'L' + (m.x + 6) + ' ' + m.y +
         'L' + m.x + ' ' + (m.y + 6) +
-        'L' + (m.x - 6) + ' ' + m.y + 'Z"/>'
-      );
+        'L' + (m.x - 6) + ' ' + m.y + 'Z"/>';
+      // The genealogical mark for a relationship that ended: two slashes.
+      if (m.status === 'ended') {
+        svg +=
+          '<path class="union-break" d="M' + (m.x + 9) + ' ' + (m.y - 7) +
+            'L' + (m.x + 4) + ' ' + (m.y + 7) +
+            'M' + (m.x + 15) + ' ' + (m.y - 7) +
+            'L' + (m.x + 10) + ' ' + (m.y + 7) + '"/>';
+      }
+      return svg;
     });
 
     // Hit paths last so they sit on top and catch the clicks.
-    edges.innerHTML = visible.join('') + markSvg.join('') + hits.join('');
+    edges.innerHTML =
+      visible.join('') + markSvg.join('') + labels.join('') + hits.join('');
   }
 
   // ------------------------------------------------------------- action pill
@@ -332,6 +395,7 @@
     FT.selectedEdge = null;
     linkMode = null;
     stage.classList.remove('linking');
+    FT.emit('edgeselect', { sel: null });
     FT.render();
   };
 
@@ -340,6 +404,8 @@
     FT.selected = null;
     linkMode = null;
     stage.classList.remove('linking');
+    // Once, on selection — not on every render, which would fight the typing.
+    FT.emit('edgeselect', { sel: sel });
     FT.render();
   };
 

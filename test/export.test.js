@@ -27,6 +27,18 @@ module.exports = async function (t, h) {
   const paths = (svg.match(/<path d=/g) || []).length;
   t.ok(paths >= edges, 'every connector is drawn (' + paths + ' paths for ' + edges + ' links)');
   t.ok(/1921 – 1998/.test(svg), 'cards show the lifespan in years');
+  t.ok(/m\. 1948/.test(svg), 'and marriages are captioned with their year');
+
+  // A relationship that ended, and an unmarried one, must read differently.
+  const u1 = FT.unionList()[0];
+  u1.status = 'ended';
+  u1.endDate = '1961';
+  const endedSvg = FT.buildSvg();
+  t.ok(/m\. 1948 – 1961/.test(endedSvg), 'an ended marriage shows both years');
+  u1.status = 'partners';
+  t.ok(/stroke-dasharray="7 5"/.test(FT.buildSvg()), 'a partnership is dashed');
+  u1.status = 'married';
+  u1.endDate = '';
 
   // The export must be parseable, not merely string-shaped.
   const parsed = new w.DOMParser().parseFromString(svg, 'image/svg+xml');
@@ -106,6 +118,11 @@ module.exports = async function (t, h) {
   t.ok(/2 November 1998/.test(detail), 'including the death date');
   t.ok(/FROM/.test(detail) && /Sinj, Croatia/.test(detail), 'shows where they were from');
   t.ok(/KNOWN FOR/.test(detail), 'has a known-for section');
+  FT.state.people[josip].birthSurname = 'Kovačić';
+  const withSurname = FT.buildDetailedSvg();
+  t.ok(/BORN AS/.test(withSurname) && /Kovačić/.test(withSurname),
+    'shows the surname someone was born with');
+  FT.state.people[josip].birthSurname = '';
   t.ok(/2 CHAPTERS/.test(detail) && /1 CHAPTER/.test(detail),
     'counts chapters, singular and plural');
 

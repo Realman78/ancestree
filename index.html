@@ -158,6 +158,18 @@
 <div id="edgePill" class="pill edge-pill" hidden>
   <span class="edge-label" id="edgeLabel"></span>
   <span class="pill-sep"></span>
+  <span id="edgeUnion" class="edge-union" hidden>
+    <select id="unionStatus" aria-label="Kind of relationship">
+      <option value="married">Married</option>
+      <option value="partners">Partners</option>
+      <option value="ended">Ended</option>
+    </select>
+    <input id="unionFrom" class="union-date" placeholder="from"
+           aria-label="Year it began" size="6">
+    <input id="unionTo" class="union-date" placeholder="until"
+           aria-label="Year it ended" size="6">
+    <span class="pill-sep"></span>
+  </span>
   <button data-action="removeEdge" class="danger" title="Remove this link (Del)">Remove link</button>
 </div>
 

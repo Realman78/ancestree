@@ -62,6 +62,13 @@
     return Number(m[3]) + ' ' + months[Number(m[2]) - 1] + ' ' + m[1];
   };
 
+  /* "born Marić" — shown when someone took a different surname on marrying.
+     Deliberately not "née": that is feminine, and this happens either way. */
+  FT.bornAs = function (p) {
+    const v = String((p && p.birthSurname) || '').trim();
+    return v ? 'born ' + v : '';
+  };
+
   FT.lifespan = function (p) {
     const b = FT.yearOf(p.birth);
     const d = FT.yearOf(p.death);
@@ -82,6 +89,7 @@
         birth: '',
         death: '',
         birthplace: '',
+        birthSurname: '', // the surname they were born with, if it changed
         knownFor: '',
         photo: '', // a downscaled data: URL, or '' for initials
         x: 0,
@@ -113,8 +121,48 @@
     }).length;
   };
 
+  FT.UNION_STATUS = ['married', 'partners', 'ended'];
+
   FT.newUnion = function (attrs) {
-    return Object.assign({ id: FT.uid('u'), partners: [], children: [] }, attrs || {});
+    return Object.assign(
+      {
+        id: FT.uid('u'),
+        partners: [],
+        children: [],
+        status: 'married',
+        date: '',    // when it began
+        endDate: '', // when it ended, if it did
+      },
+      attrs || {}
+    );
+  };
+
+  /* "m. 1948", "m. 1948 – 1952", "partners since 1970". Empty when nothing is
+     recorded, so the drawing stays clean for trees that do not track it. */
+  FT.unionLabel = function (u) {
+    if (!u) return '';
+    const from = FT.yearOf(u.date);
+    const to = FT.yearOf(u.endDate);
+    if (u.status === 'partners') {
+      if (from && to) return from + ' – ' + to;
+      return from ? 'since ' + from : '';
+    }
+    if (from && to) return 'm. ' + from + ' – ' + to;
+    if (from) return 'm. ' + from;
+    if (to) return 'until ' + to;
+    return u.status === 'ended' ? 'ended' : '';
+  };
+
+  /* Chronological where dates allow it, so remarriages read left to right. */
+  FT.sortUnions = function (list) {
+    return list.slice().sort(function (a, b) {
+      const av = String(a.date || '');
+      const bv = String(b.date || '');
+      if (av && bv) return av.localeCompare(bv);
+      if (av) return -1; // dated unions come before undated ones
+      if (bv) return 1;
+      return 0;
+    });
   };
 
   FT.newTree = function (title) {
@@ -238,6 +286,7 @@
         birth: String(p.birth || ''),
         death: String(p.death || ''),
         birthplace: String(p.birthplace || ''),
+        birthSurname: String(p.birthSurname || ''),
         knownFor: String(p.knownFor || ''),
         photo: FT.safePhoto(p.photo),
         x: Number.isFinite(p.x) ? p.x : 0,
@@ -269,7 +318,18 @@
         return t.people[pid];
       });
       if (!partners.length && !children.length) return;
-      t.unions[id] = FT.newUnion({ id: id, partners: partners.slice(0, 2), children: children });
+      let endDate = String(u.endDate || '');
+      const date = String(u.date || '');
+      // An end before the beginning is meaningless; drop it rather than store it.
+      if (endDate && date && endDate < date) endDate = '';
+      t.unions[id] = FT.newUnion({
+        id: id,
+        partners: partners.slice(0, 2),
+        children: children,
+        status: FT.UNION_STATUS.indexOf(u.status) >= 0 ? u.status : 'married',
+        date: date,
+        endDate: endDate,
+      });
     });
     return t;
   };
@@ -548,15 +608,20 @@
       t.people[p.id] = p;
       return p;
     };
-    const union = function (partners, children) {
-      const u = FT.newUnion({
-        partners: partners.map(function (p) {
-          return p.id;
-        }),
-        children: children.map(function (p) {
-          return p.id;
-        }),
-      });
+    const union = function (partners, children, attrs) {
+      const u = FT.newUnion(
+        Object.assign(
+          {
+            partners: partners.map(function (p) {
+              return p.id;
+            }),
+            children: children.map(function (p) {
+              return p.id;
+            }),
+          },
+          attrs || {}
+        )
+      );
       t.unions[u.id] = u;
       return u;
     };
@@ -589,6 +654,7 @@
 
     const ana = mk('Ana Kovač', 'f', '1925-07-21', '2004-02-16', {
       birthplace: 'Trilj, Croatia',
+      birthSurname: 'Buljan',
       knownFor: 'Kept the village school open through two hard winters',
     });
     ana.entries = [
@@ -618,7 +684,10 @@
       },
     ];
 
-    const vera = mk('Vera Kovač', 'f', '1956-05-08', '', { birthplace: 'Split, Croatia' });
+    const vera = mk('Vera Kovač', 'f', '1956-05-08', '', {
+      birthplace: 'Split, Croatia',
+      birthSurname: 'Perić',
+    });
     const ivana = mk('Ivana Kovač', 'f', '1958-01-30', '', {
       birthplace: 'Sinj, Croatia',
       knownFor: 'Sailed the Adriatic single-handed at nineteen',
@@ -628,9 +697,9 @@
     const tomo = mk('Tomislav Kovač', 'm', '1985-08-27', '', { birthplace: 'Zagreb, Croatia' });
     const nina = mk('Nina Marić', 'f', '1984-06-15', '', {});
 
-    union([josip, ana], [marko, ivana]);
-    union([marko, vera], [petra, tomo]);
-    union([ivana, luka], [nina]);
+    union([josip, ana], [marko, ivana], { date: '1948-09-19' });
+    union([marko, vera], [petra, tomo], { date: '1980-06-14' });
+    union([ivana, luka], [nina], { date: '1982-04-02', status: 'partners' });
     return t;
   };
 })();

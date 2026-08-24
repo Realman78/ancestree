@@ -130,6 +130,103 @@ module.exports = function (t, h) {
   t.ok(!doc.parentUnionOf(d.Petra.id), 'a detached child has no parents');
   t.ok(!!doc.state.people[d.Petra.id], 'but is still in the tree');
 
+  t.section('multiple partners stay contiguous');
+  // Laying out one union at a time let an unrelated card sit between a couple,
+  // which made two strangers read as married. The whole partnership component
+  // is placed as one run now.
+  const mp = h.loadHeadless();
+  const build = (unions) => {
+    mp.state = mp.newTree('x');
+    const id = {};
+    const need = new Set();
+    unions.forEach((u) => u.p.concat(u.c || []).forEach((n) => need.add(n)));
+    need.forEach((n) => (id[n] = mp.addPerson({ name: n, x: 0, y: 0 }).id));
+    unions.forEach((u) => {
+      mp.state.unions[mp.uid('u')] = mp.newUnion({
+        partners: u.p.map((n) => id[n]),
+        children: (u.c || []).map((n) => id[n]),
+        date: u.d || '',
+      });
+    });
+    mp.autoArrange();
+    return id;
+  };
+  const rowOrder = (y) =>
+    mp.peopleList().filter((p) => p.y === y).sort((a, b) => a.x - b.x).map((p) => p.name);
+  const adjacent = (aId, bId) =>
+    Math.abs(mp.state.people[aId].x - mp.state.people[bId].x) <= mp.CARD_W + mp.SPOUSE_GAP + 1;
+  const anyOverlap = () => {
+    const L = mp.peopleList();
+    for (let i = 0; i < L.length; i++)
+      for (let j = i + 1; j < L.length; j++)
+        if (Math.abs(L[i].x - L[j].x) < mp.CARD_W && Math.abs(L[i].y - L[j].y) < mp.CARD_H) return true;
+    return false;
+  };
+
+  let id = build([
+    { p: ['Ana', 'Josip'], c: ['Ivan', 'Maja'], d: '1948' },
+    { p: ['Josip', 'Marta'], c: ['Petar'], d: '1962' },
+  ]);
+  t.ok(adjacent(id.Ana, id.Josip) && adjacent(id.Josip, id.Marta),
+    'a remarriage seats both spouses beside the person (' + rowOrder(0).join(' ') + ')');
+  t.ok(!anyOverlap(), 'with nothing overlapping');
+  t.ok(mp.parentsOf(id.Ivan).includes(id.Josip) && !mp.parentsOf(id.Petar).includes(id.Ana),
+    'and each set of children keeps its own parents');
+
+  // The case that was actively wrong: both spouses remarry.
+  id = build([
+    { p: ['Josip', 'Ana'], c: ['Ivan'], d: '1948' },
+    { p: ['Josip', 'Marta'], c: ['Petar'], d: '1962' },
+    { p: ['Ana', 'Boris'], c: ['Nina'], d: '1965' },
+  ]);
+  t.ok(adjacent(id.Josip, id.Ana), 'Josip and Ana sit together');
+  t.ok(adjacent(id.Josip, id.Marta), 'Josip and Marta sit together');
+  t.ok(adjacent(id.Ana, id.Boris), 'Ana and Boris sit together');
+  t.ok(!anyOverlap(), 'and nothing overlaps (' + rowOrder(0).join(' ') + ')');
+  // Nobody should be parked between a couple, which is what read as a marriage.
+  const row = rowOrder(0);
+  const between = (a, b) => {
+    const i = row.indexOf(a);
+    const j = row.indexOf(b);
+    return Math.abs(i - j) - 1;
+  };
+  t.ok(between('Josip', 'Ana') === 0, 'no stranger sits between Josip and Ana');
+  t.ok(between('Ana', 'Boris') === 0, 'nor between Ana and Boris');
+
+  // A star cannot seat every spouse adjacent — but it must still be sane.
+  id = build([
+    { p: ['Ana', 'Josip'], c: ['Ivan'], d: '1948' },
+    { p: ['Josip', 'Marta'], c: ['Petar'], d: '1957' },
+    { p: ['Josip', 'Vera'], c: ['Nina'], d: '1970' },
+  ]);
+  t.ok(!anyOverlap(), 'three marriages lay out without overlap (' + rowOrder(0).join(' ') + ')');
+  const reaching = mp.unionList().filter((u) => u.partners.length === 2 &&
+    !adjacent(u.partners[0], u.partners[1]));
+  t.ok(reaching.length <= 1, 'at most one union has to reach past a card');
+  t.ok(mp.peopleList().every((p) => p.y / mp.ROW_H <= 1), 'and everyone stays in two rows');
+
+  t.section('union attributes');
+  t.ok(mp.newUnion().status === 'married', 'a new union is a marriage by default');
+  t.ok(mp.unionLabel({ status: 'married', date: '1948-09-19', endDate: '' }) === 'm. 1948',
+    'a marriage is labelled with its year');
+  t.ok(mp.unionLabel({ status: 'married', date: '1948', endDate: '1961' }) === 'm. 1948 – 1961',
+    'and with both years when it ended');
+  t.ok(mp.unionLabel({ status: 'partners', date: '1970' }) === 'since 1970',
+    'an unmarried partnership reads differently');
+  t.ok(mp.unionLabel({ status: 'married', date: '', endDate: '' }) === '',
+    'nothing is drawn when no dates are recorded');
+  const sorted = mp.sortUnions([
+    { id: 'b', date: '1962' }, { id: 'a', date: '1948' }, { id: 'c', date: '' },
+  ]);
+  t.ok(sorted.map((u) => u.id).join('') === 'abc', 'unions order chronologically, undated last');
+
+  t.section('born surname');
+  t.ok(mp.newPerson().birthSurname === '', 'people start with none');
+  t.ok(mp.bornAs({ birthSurname: 'Marić' }) === 'born Marić', 'shown as "born X"');
+  t.ok(mp.bornAs({ birthSurname: '  ' }) === '', 'blank stays blank');
+  t.ok(mp.normalize({ people: { a: { name: 'A', birthSurname: 42 } } }).people.a.birthSurname === '42',
+    'a non-string is coerced rather than trusted');
+
   t.section('dates');
   t.ok(FT.isIsoDate('1921-03-14') && !FT.isIsoDate('1921'), 'recognises a full date');
   t.ok(FT.yearOf('1921-03-14') === '1921', 'takes the year from a picked date');

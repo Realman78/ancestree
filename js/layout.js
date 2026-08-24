@@ -92,38 +92,139 @@
     return u.partners.length >= 2 && FT.ancestrallyRelated(u.partners[0], u.partners[1]);
   };
 
-  /* Size a subtree rooted at `pid`. `seen` prevents a person being laid out
-     twice when they are reachable by more than one path. */
-  function measure(pid, seen, gen) {
-    if (seen[pid]) return null;
-    seen[pid] = true;
+  /* Everyone joined to `pid` by partnership, on the same row.
 
-    const partnerIds = [];
-    const childBlocks = [];
+     Laying out one union at a time was not enough: a person absorbed as
+     somebody's partner took their *other* spouses with them nowhere, so those
+     spouses were placed as separate blocks and an unrelated card could end up
+     sitting between a couple. Two people side by side read as married, so that
+     was not merely untidy — the drawing said something untrue.
 
-    FT.unionsOf(pid).forEach(function (u) {
-      u.partners.forEach(function (q) {
-        // Only seat a partner beside this person if they share a row. One who
-        // could not be levelled is laid out from their own place in the tree.
-        if (q !== pid && !seen[q] && gen[q] === gen[pid]) {
-          seen[q] = true;
-          partnerIds.push(q);
+     Take the whole partnership component instead, and order it as a path so
+     each couple lands adjacent wherever the shape allows. A chain (A–B, B–C)
+     orders A, B, C exactly; a star (one person, three spouses) can only seat
+     two of them adjacent, and the renderer routes the reaching one around. */
+  function spouseCluster(pid, seen, gen) {
+    const inSet = {};
+    const members = [];
+    const queue = [pid];
+    while (queue.length) {
+      const cur = queue.shift();
+      if (inSet[cur] || seen[cur]) continue;
+      inSet[cur] = true;
+      members.push(cur);
+      FT.partnersOf(cur).forEach(function (q) {
+        if (!inSet[q] && !seen[q] && gen[q] === gen[cur]) queue.push(q);
+      });
+    }
+    if (members.length < 3) return members;
+
+    const nbr = {};
+    members.forEach(function (m) {
+      nbr[m] = FT.partnersOf(m).filter(function (q) {
+        return inSet[q];
+      });
+    });
+
+    // Start at an end of the chain if there is one, then always step to the
+    // most constrained neighbour so leaves are consumed before hubs.
+    const used = {};
+    const order = [];
+    let cur =
+      members.find(function (m) {
+        return nbr[m].length === 1;
+      }) || members[0];
+
+    while (cur) {
+      order.push(cur);
+      used[cur] = true;
+      let next = null;
+      let bestDeg = Infinity;
+      nbr[cur].forEach(function (q) {
+        if (used[q]) return;
+        const deg = nbr[q].filter(function (x) {
+          return !used[x];
+        }).length;
+        if (deg < bestDeg) {
+          bestDeg = deg;
+          next = q;
         }
       });
+      if (!next) {
+        next =
+          members.find(function (m) {
+            return !used[m];
+          }) || null;
+      }
+      cur = next;
+    }
+    return order;
+  }
+
+  /* Size a subtree rooted at the spouse cluster containing `pid`. `seen`
+     prevents a person being laid out twice when reachable by more than one
+     path. */
+  function measure(pid, seen, gen) {
+    if (seen[pid]) return null;
+
+    const cluster = spouseCluster(pid, seen, gen);
+    if (!cluster.length) return null;
+    // Mark the whole cluster before recursing, so a descendant cannot claim one
+    // of these people as part of its own block.
+    cluster.forEach(function (id) {
+      seen[id] = true;
+    });
+
+    const pos = {};
+    cluster.forEach(function (id, i) {
+      pos[id] = i;
+    });
+
+    // Every union among these people, ordered to follow them left to right so
+    // each family's children sit under the right parents.
+    const taken = {};
+    const unions = [];
+    cluster.forEach(function (id) {
+      FT.unionsOf(id).forEach(function (u) {
+        if (taken[u.id]) return;
+        taken[u.id] = true;
+        unions.push(u);
+      });
+    });
+    const seat = function (u) {
+      const seats = u.partners
+        .map(function (p) {
+          return pos[p];
+        })
+        .filter(function (n) {
+          return n !== undefined;
+        });
+      if (!seats.length) return 0;
+      return seats.reduce(function (a, b) {
+        return a + b;
+      }, 0) / seats.length;
+    };
+    unions.sort(function (a, b) {
+      return seat(a) - seat(b);
+    });
+
+    const childBlocks = [];
+    unions.forEach(function (u) {
       u.children.forEach(function (c) {
         const block = measure(c, seen, gen);
         if (block) childBlocks.push(block);
       });
     });
 
-    const selfW = FT.CARD_W + partnerIds.length * (FT.SPOUSE_GAP + FT.CARD_W);
-    const childW = childBlocks.reduce(function (sum, b) {
-      return sum + b.w;
-    }, 0) + Math.max(0, childBlocks.length - 1) * FT.SIB_GAP;
+    const selfW =
+      cluster.length * FT.CARD_W + (cluster.length - 1) * FT.SPOUSE_GAP;
+    const childW =
+      childBlocks.reduce(function (sum, b) {
+        return sum + b.w;
+      }, 0) + Math.max(0, childBlocks.length - 1) * FT.SIB_GAP;
 
     return {
-      pid: pid,
-      partnerIds: partnerIds,
+      cluster: cluster,
       childBlocks: childBlocks,
       selfW: selfW,
       w: Math.max(selfW, childW),
@@ -131,13 +232,12 @@
     };
   }
 
-  /* Assign x positions: the couple is centred in its own block, and the block's
-     children are centred underneath it. */
+  /* Assign x positions: the cluster is centred in its own block, and the
+     block's children are centred underneath it. */
   function place(block, left, xs) {
     const selfLeft = left + (block.w - block.selfW) / 2;
-    xs[block.pid] = selfLeft;
-    block.partnerIds.forEach(function (q, i) {
-      xs[q] = selfLeft + (i + 1) * (FT.CARD_W + FT.SPOUSE_GAP);
+    block.cluster.forEach(function (id, i) {
+      xs[id] = selfLeft + i * (FT.CARD_W + FT.SPOUSE_GAP);
     });
 
     let cx = left + (block.w - block.childW) / 2;

@@ -205,6 +205,7 @@
       '<div class="person-fields">' +
         dateField('Born', 'birth', p.birth) +
         dateField('Died', 'death', p.death) +
+        field('Born as', 'birthSurname', p.birthSurname, 'Surname before marrying') +
         field('From', 'birthplace', p.birthplace, 'Place') +
         genderField(p.gender) +
         clampField('Known for', 'knownFor', p.knownFor, 'A line or two about them') +

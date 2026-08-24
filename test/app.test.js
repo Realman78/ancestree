@@ -140,6 +140,12 @@ module.exports = async function (t, h) {
   );
   t.ok(!$('#wordCount'), 'the chapter page has no word counter');
 
+  const surname = $('[data-field="birthSurname"]');
+  t.ok(!!surname, 'the book has a field for the surname someone was born with');
+  surname.value = 'Buljan';
+  surname.dispatchEvent(new w.Event('input', { bubbles: true }));
+  t.ok(FT.state.people[josip].birthSurname === 'Buljan', 'and it saves through');
+
   const nameEl = $('#pageLeft .person-name');
   nameEl.value = 'Josip K.';
   nameEl.dispatchEvent(new w.Event('input', { bubbles: true }));

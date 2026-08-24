@@ -1203,3 +1203,42 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
   cursor: pointer;
 }
 .zoom-presets button:hover { background: rgba(180,150,90,.14); border-color: var(--line); }
+
+/* ------------------------------------------------------- union states */
+
+/* An unmarried partnership: the usual genealogical dashed line. */
+.edge.unwed { stroke-dasharray: 6 4; }
+
+.union-break {
+  fill: none;
+  stroke: #a8917a;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.union-label {
+  font-family: var(--ui);
+  font-size: 10px;
+  letter-spacing: .03em;
+  fill: var(--ink-faint);
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+
+.edge-union { display: flex; align-items: center; gap: 4px; }
+.edge-union select,
+.edge-union .union-date {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffdf7;
+  color: var(--ink);
+}
+.edge-union .union-date { width: 62px; }
+.edge-union select:focus,
+.edge-union .union-date:focus { outline: none; border-color: var(--gold); background: #fff; }

@@ -49,6 +49,22 @@ and `Ctrl+Z` / `Ctrl+Shift+Z` as well. Where a step genuinely cannot be undone �
 deleting a whole tree — an in-app dialog asks first. Not the browser's, so a
 blocked dialog cannot swallow it.
 
+**Several partners, and children by each.** A person can be in any number of
+relationships, each with its own children. Tidy-up keeps a whole partnership
+group together — nobody unrelated is ever parked between a couple, because two
+cards side by side read as married and that would make the drawing say something
+untrue. Each family drops onto its own bus so two sets of children never merge
+into one row of siblings, and where somebody has so many partners that one
+connector has to reach past a card, it is routed *under* the row so it visibly
+goes around rather than hiding behind.
+
+Select a relationship line to set what it was: **married**, **partners**, or
+**ended**, with the years it ran. The line is captioned (`m. 1948 – 1961`), an
+unmarried partnership is dashed, and one that ended carries the genealogical
+double-slash. Relationships order chronologically, so remarriages read left to
+right. Nothing is drawn when no dates are recorded, so trees that do not track
+this stay clean.
+
 **Partners from different generations** — someone partnered with a descendant —
 are rare but real, and are drawn as a dashed curve instead of the usual squared
 connector. Such a couple cannot share a generation row, so they keep their own,
@@ -66,6 +82,9 @@ open chapter, on ruled paper, which you just type into. It saves as you write.
 
 **Gender** is a field on each person (Woman / Man / Unspecified) that sets the
 card's tint and matches the legend in the bottom bar.
+
+**Born as** records the surname someone carried before marrying. It shows in the
+book and in the detailed export; the canvas card has no room for it.
 
 Born and Died are date pickers, with a `≈` button beside each that swaps in a plain text box for the dates genealogy is
 actually made of — `c. 1880`, `spring 1943`, `before the war`. The field
@@ -98,7 +117,7 @@ back, so a new browser can be restored in one step.
 |---|---|
 | **JSON** | the whole tree, the only form that can be imported back |
 | **SVG** | a vector drawing of the canvas, portraits and all, in one file |
-| **Detailed SVG** | a proper chart: large portraits, room for long names, full dates with day and month, birthplace, a two-line "known for", and how many chapters each book holds |
+| **Detailed SVG** | a proper chart: large portraits, room for long names, full dates with day and month, birth surname, birthplace, a two-line "known for", and how many chapters each book holds |
 | **PNG** | the canvas drawing as an image, rendered at 2× |
 
 The detailed export scales the arrangement up around its much bigger cards, so
@@ -152,9 +171,12 @@ test/             npm test — five jsdom suites plus a real-browser pass
 - **No sharing.** To give someone a tree you send them the file. There is
   deliberately no upload, no link, and nothing holding copies of anyone's
   diaries — but equally no way for two people to work on the same tree.
-- **One partnership per couple.** A person can have several partners, but
-  remarriages and step-families draw as separate unions rather than anything
-  cleverer, and a child belongs to exactly one union.
+- **A child belongs to exactly one union.** Step-parents and adoption have no
+  separate notion — you can record the partnership, but a child hangs from one
+  couple only.
+- **Four or more partners will crowd.** Three lay out cleanly; beyond that more
+  than one connector has to reach past a card, and while none of them hide
+  behind anything, the row gets wide.
 - **Separating a couple keeps the children with the left-hand partner.** That is
   at least predictable from the canvas, but there is no way to choose the other
   one, or to split them between the two.

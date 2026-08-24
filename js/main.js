@@ -78,6 +78,48 @@
     titleInput.setSelectionRange(0, 0);
   }
 
+  /* Editing a relationship: only partner lines have anything to say. */
+  const edgeUnion = document.getElementById('edgeUnion');
+  const unionStatus = document.getElementById('unionStatus');
+  const unionFrom = document.getElementById('unionFrom');
+  const unionTo = document.getElementById('unionTo');
+
+  FT.on('edgeselect', function (payload) {
+    const sel = payload.sel;
+    const u = sel && sel.kind === 'partner' && FT.state.unions[sel.unionId];
+    edgeUnion.hidden = !u;
+    if (!u) return;
+    unionStatus.value = FT.UNION_STATUS.indexOf(u.status) >= 0 ? u.status : 'married';
+    unionFrom.value = u.date || '';
+    unionTo.value = u.endDate || '';
+  });
+
+  function editUnion(apply, tag) {
+    const sel = FT.selectedEdge;
+    const u = sel && FT.state.unions[sel.unionId];
+    if (!u) return;
+    FT.checkpoint(tag + ':' + u.id);
+    apply(u);
+    FT.save();
+    FT.render();
+  }
+
+  unionStatus.addEventListener('change', function () {
+    editUnion(function (u) {
+      u.status = unionStatus.value;
+    }, 'union-status');
+  });
+  unionFrom.addEventListener('input', function () {
+    editUnion(function (u) {
+      u.date = unionFrom.value.trim();
+    }, 'union-from');
+  });
+  unionTo.addEventListener('input', function () {
+    editUnion(function (u) {
+      u.endDate = unionTo.value.trim();
+    }, 'union-to');
+  });
+
   const zoomLevel = document.getElementById('zoomLevel');
   const zoomMenu = document.getElementById('zoomMenu');
   const zoomInput = document.getElementById('zoomInput');

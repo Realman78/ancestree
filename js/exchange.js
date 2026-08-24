@@ -202,6 +202,49 @@
 
   FT.fitLines = fitLines; // exercised directly by the tests
 
+  /* Draw one relationship: the line, its union diamond, the "ended" slashes
+     and the date caption. Shared so both exports say the same thing. */
+  function edgeSvg(e, scale) {
+    const k = scale || 1;
+    const dash = e.crossGen ? '9 6' : e.status === 'partners' ? '7 5' : '';
+    const stroke = e.crossGen ? '#a8917a' : '#b6a483';
+    const out = [
+      '<path d="' + e.d + '" fill="none" stroke="' + stroke + '" stroke-width="' +
+        2 * k + '" stroke-linejoin="round" stroke-linecap="round"' +
+        (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>',
+    ];
+    if (e.mark) {
+      const r = 6 * k;
+      out.push(
+        '<path d="M' + e.mark.x + ' ' + (e.mark.y - r) +
+          'L' + (e.mark.x + r) + ' ' + e.mark.y +
+          'L' + e.mark.x + ' ' + (e.mark.y + r) +
+          'L' + (e.mark.x - r) + ' ' + e.mark.y + 'Z" fill="' +
+          (e.crossGen ? '#a8917a' : '#b3903f') + '" opacity="0.85"/>'
+      );
+      if (e.status === 'ended') {
+        const a = 9 * k;
+        const b = 7 * k;
+        out.push(
+          '<path d="M' + (e.mark.x + a) + ' ' + (e.mark.y - b) +
+            'L' + (e.mark.x + a - 5 * k) + ' ' + (e.mark.y + b) +
+            'M' + (e.mark.x + a + 6 * k) + ' ' + (e.mark.y - b) +
+            'L' + (e.mark.x + a + k) + ' ' + (e.mark.y + b) +
+            '" fill="none" stroke="#a8917a" stroke-width="' + 1.8 * k +
+            '" stroke-linecap="round"/>'
+        );
+      }
+    }
+    if (e.label && e.labelPos) {
+      out.push(
+        '<text x="' + e.labelPos.x + '" y="' + e.labelPos.y + '" text-anchor="middle" ' +
+          'font-family="Helvetica, Arial, sans-serif" font-size="' + 10 * k +
+          '" fill="#9a9084">' + esc(e.label) + '</text>'
+      );
+    }
+    return out.join('');
+  }
+
   const SERIF = 'Georgia, serif';
   const SANS = 'Helvetica, Arial, sans-serif';
   const font = function (size, family) {
@@ -233,21 +276,7 @@
 
     // Connectors, reusing the renderer's own geometry so the drawing matches.
     FT.edgeGeometry().forEach(function (e) {
-      out.push(
-        '<path d="' + e.d + '" fill="none" stroke="' +
-          (e.crossGen ? '#a8917a' : '#b6a483') + '" stroke-width="2" ' +
-          'stroke-linejoin="round" stroke-linecap="round"' +
-          (e.crossGen ? ' stroke-dasharray="7 5"' : '') + '/>'
-      );
-      if (e.mark) {
-        out.push(
-          '<path d="M' + e.mark.x + ' ' + (e.mark.y - 6) +
-            'L' + (e.mark.x + 6) + ' ' + e.mark.y +
-            'L' + e.mark.x + ' ' + (e.mark.y + 6) +
-            'L' + (e.mark.x - 6) + ' ' + e.mark.y + 'Z" fill="' +
-            (e.crossGen ? '#a8917a' : '#b3903f') + '" opacity="0.85"/>'
-        );
-      }
+      out.push(edgeSvg(e, 1));
     });
 
     people.forEach(function (p) {
@@ -329,13 +358,37 @@
      that the bigger cards do not collide. */
   const D = {
     w: 340,
-    h: 244,
+    h: 268, // tall enough for four fact rows plus a two-line "known for"
+
     scale: 1.85,
     photoR: 38,
     photoCx: 58,
     photoCy: 60,
     textX: 112,
+    rowTop: 130,
+    rowPitch: 21,
+    ruleA: 110,
+    ruleB: 204,
+    knownLabelY: 222,
+    knownTextY: 238,
   };
+
+  /* The label column has to clear the widest label, or the value lands on top
+     of it. Measure rather than guess — "BORN AS" is wider than it looks with
+     letter-spacing applied. */
+  const ROW_LABELS = ['BORN', 'DIED', 'BORN AS', 'FROM'];
+  const LABEL_TRACK = 0.13; // matches letter-spacing in the markup, in em
+  let valueXCache = 0;
+  function valueX() {
+    if (valueXCache) return valueXCache;
+    const f = font(9.5, SERIF);
+    const widest = ROW_LABELS.reduce(function (max, txt) {
+      // measureText knows nothing of letter-spacing, so add it back.
+      return Math.max(max, widthOf(txt, f) + LABEL_TRACK * 9.5 * txt.length);
+    }, 0);
+    valueXCache = Math.ceil(20 + widest + 12);
+    return valueXCache;
+  }
 
   function detailLayout() {
     const people = {};
@@ -415,58 +468,64 @@
 
     // Name, over two lines if it needs them, then the lifespan in years.
     const nameLines = fitLines(p.name, font(20, SERIF), D.w - D.textX - 20, 2);
-    let y = nameLines.length > 1 ? 52 : 60;
+    // 20px type needs more than 23px of pitch, or the two lines touch.
+    const NAME_PITCH = 26;
+    let y = nameLines.length > 1 ? 50 : 60;
     nameLines.forEach(function (line, i) {
       out.push(
-        '<text x="' + D.textX + '" y="' + (y + i * 23) + '" font-family="Georgia, serif" ' +
-          'font-size="20" fill="#2c2620">' + esc(line) + '</text>'
+        '<text x="' + D.textX + '" y="' + (y + i * NAME_PITCH) + '" ' +
+          'font-family="Georgia, serif" font-size="20" fill="#2c2620">' +
+          esc(line) + '</text>'
       );
     });
-    y += (nameLines.length - 1) * 23;
+    y += (nameLines.length - 1) * NAME_PITCH;
     const span = FT.lifespan(p);
     if (span) {
       out.push(
-        '<text x="' + D.textX + '" y="' + (y + 21) + '" ' +
+        '<text x="' + D.textX + '" y="' + (y + 22) + '" ' +
           'font-family="Helvetica, Arial, sans-serif" font-size="12.5" ' +
           'letter-spacing="0.04em" fill="#6b6154">' + esc(span) + '</text>'
       );
     }
 
-    out.push('<line x1="20" y1="110" x2="' + (D.w - 20) +
-      '" y2="110" stroke="#e7ddca" stroke-width="1"/>');
+    out.push('<line x1="20" y1="' + D.ruleA + '" x2="' + (D.w - 20) +
+      '" y2="' + D.ruleA + '" stroke="#e7ddca" stroke-width="1"/>');
 
     // Facts, in whatever order they exist — a sparse person gets a sparse card
     // rather than a column of dashes.
     const rows = [];
     if (p.birth) rows.push(['BORN', FT.prettyDate(p.birth)]);
     if (p.death) rows.push(['DIED', FT.prettyDate(p.death)]);
+    if (p.birthSurname) rows.push(['BORN AS', p.birthSurname]);
     if (p.birthplace) rows.push(['FROM', p.birthplace]);
 
-    let ry = 132;
+    const vx = valueX();
+    let ry = D.rowTop;
     rows.forEach(function (row) {
       out.push(
         '<text x="20" y="' + ry + '" font-family="Georgia, serif" font-size="9.5" ' +
-          'letter-spacing="0.13em" fill="#9a9084">' + row[0] + '</text>'
+          'letter-spacing="' + LABEL_TRACK + 'em" fill="#9a9084">' + row[0] + '</text>'
       );
       out.push(
-        '<text x="76" y="' + ry + '" font-family="Helvetica, Arial, sans-serif" ' +
+        '<text x="' + vx + '" y="' + ry + '" font-family="Helvetica, Arial, sans-serif" ' +
           'font-size="12.5" fill="#3b332a">' +
-          esc(fitLines(row[1], font(12.5, SANS), D.w - 76 - 20, 1)[0] || '') + '</text>'
+          esc(fitLines(row[1], font(12.5, SANS), D.w - vx - 20, 1)[0] || '') + '</text>'
       );
-      ry += 21;
+      ry += D.rowPitch;
     });
 
     // Known for: a label and up to two lines, at the foot of the card.
     if (p.knownFor) {
-      out.push('<line x1="20" y1="182" x2="' + (D.w - 20) +
-        '" y2="182" stroke="#e7ddca" stroke-width="1"/>');
+      out.push('<line x1="20" y1="' + D.ruleB + '" x2="' + (D.w - 20) +
+        '" y2="' + D.ruleB + '" stroke="#e7ddca" stroke-width="1"/>');
       out.push(
-        '<text x="20" y="200" font-family="Georgia, serif" font-size="9.5" ' +
-          'letter-spacing="0.13em" fill="#9a9084">KNOWN FOR</text>'
+        '<text x="20" y="' + D.knownLabelY + '" font-family="Georgia, serif" ' +
+          'font-size="9.5" letter-spacing="' + LABEL_TRACK +
+          'em" fill="#9a9084">KNOWN FOR</text>'
       );
       fitLines(p.knownFor, font(12.5, SERIF), D.w - 40, 2).forEach(function (line, i) {
         out.push(
-          '<text x="20" y="' + (217 + i * 16) + '" font-family="Georgia, serif" ' +
+          '<text x="20" y="' + (D.knownTextY + i * 16) + '" font-family="Georgia, serif" ' +
             'font-size="12.5" fill="#3b332a">' + esc(line) + '</text>'
         );
       });
@@ -502,21 +561,7 @@
     out.push('<g transform="translate(' + ox + ',' + oy + ')">');
 
     FT.edgeGeometry(layout).forEach(function (e) {
-      out.push(
-        '<path d="' + e.d + '" fill="none" stroke="' +
-          (e.crossGen ? '#a8917a' : '#b6a483') + '" stroke-width="2.5" ' +
-          'stroke-linejoin="round" stroke-linecap="round"' +
-          (e.crossGen ? ' stroke-dasharray="9 6"' : '') + '/>'
-      );
-      if (e.mark) {
-        out.push(
-          '<path d="M' + e.mark.x + ' ' + (e.mark.y - 7) +
-            'L' + (e.mark.x + 7) + ' ' + e.mark.y +
-            'L' + e.mark.x + ' ' + (e.mark.y + 7) +
-            'L' + (e.mark.x - 7) + ' ' + e.mark.y + 'Z" fill="' +
-            (e.crossGen ? '#a8917a' : '#b3903f') + '" opacity="0.85"/>'
-        );
-      }
+      out.push(edgeSvg(e, 1.25));
     });
 
     FT.peopleList().forEach(function (p) {

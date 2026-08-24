@@ -206,6 +206,125 @@ module.exports = async function (t, h) {
     await page.waitForTimeout(250);
     t.ok(await page.evaluate(() => FT.selectedEdge === null), 'Escape deselects a line');
 
+    t.section('editing a relationship');
+    await page.evaluate(() => {
+      FT.adoptDocument(FT.newTree('Remarriage'));
+      const id = {};
+      ['Josip', 'Ana', 'Marta', 'Ivan', 'Petar'].forEach((n) => {
+        id[n] = FT.addPerson({ name: n, x: 0, y: 0 }).id;
+      });
+      const U = (p, c) => {
+        const u = FT.newUnion({ partners: p.map((n) => id[n]), children: c.map((n) => id[n]) });
+        FT.state.unions[u.id] = u;
+        return u;
+      };
+      window.__u1 = U(['Ana', 'Josip'], ['Ivan']).id;
+      U(['Josip', 'Marta'], ['Petar']);
+      FT.autoArrange();
+      FT.render();
+      FT.fitToScreen();
+    });
+    await page.waitForTimeout(600);
+
+    await page.evaluate(() =>
+      FT.selectEdge({ kind: 'partner', unionId: window.__u1, childId: null }));
+    await page.waitForTimeout(300);
+    t.ok(await page.locator('#edgeUnion').isVisible(), 'a partner line offers its details');
+    t.ok((await page.inputValue('#unionStatus')) === 'married', 'defaulting to a marriage');
+
+    await page.fill('#unionFrom', '1948');
+    await page.waitForTimeout(400);
+    t.ok(
+      await page.evaluate(() => FT.state.unions[window.__u1].date === '1948'),
+      'a start year is stored on the union'
+    );
+    t.ok(
+      (await page.locator('#edges text.union-label').first().textContent()) === 'm. 1948',
+      'and captioned on the line'
+    );
+
+    await page.selectOption('#unionStatus', 'ended');
+    await page.fill('#unionTo', '1961');
+    await page.waitForTimeout(400);
+    t.ok(
+      await page.evaluate(() => FT.state.unions[window.__u1].status === 'ended'),
+      'the relationship can be marked as ended'
+    );
+    t.ok((await page.locator('#edges .union-break').count()) === 1,
+      'which draws the break mark across the line');
+    t.ok(
+      (await page.locator('#edges text.union-label').first().textContent()) === 'm. 1948 – 1961',
+      'and both years are shown'
+    );
+
+    await page.selectOption('#unionStatus', 'partners');
+    await page.waitForTimeout(400);
+    t.ok((await page.locator('#edges path.edge.unwed').count()) >= 1,
+      'an unmarried partnership is dashed');
+    t.ok((await page.locator('#edges .union-break').count()) === 0, 'and carries no break mark');
+
+    // A child line has no union details to edit.
+    await page.evaluate(() => {
+      const u = FT.unionList().find((x) => x.children.length);
+      FT.selectEdge({ kind: 'child', unionId: u.id, childId: u.children[0] });
+    });
+    await page.waitForTimeout(250);
+    t.ok(!(await page.locator('#edgeUnion').isVisible()), 'a child line shows no relationship fields');
+
+    t.section('a union label is never hidden behind a card');
+    const labelClear = await page.evaluate(() => {
+      FT.selectEdge(null);
+      const cards = Array.from(document.querySelectorAll('.card')).map((c) =>
+        c.getBoundingClientRect());
+      return Array.from(document.querySelectorAll('#edges text.union-label')).every((t) => {
+        const r = t.getBoundingClientRect();
+        if (!r.width) return true;
+        return !cards.some((c) =>
+          r.left < c.right - 1 && r.right > c.left + 1 && r.top < c.bottom - 1 && r.bottom > c.top + 1);
+      });
+    });
+    t.ok(labelClear, 'captions sit clear of every card, not clipped behind one');
+
+    t.section('a reaching partner line goes around, not behind');
+    const routed = await page.evaluate(() => {
+      FT.adoptDocument(FT.newTree('Three marriages'));
+      const id = {};
+      ['Josip', 'Ana', 'Marta', 'Vera'].forEach((n) => {
+        id[n] = FT.addPerson({ name: n, x: 0, y: 0 }).id;
+      });
+      [['Ana', 'Josip'], ['Josip', 'Marta'], ['Josip', 'Vera']].forEach((pair) => {
+        const u = FT.newUnion({ partners: pair.map((n) => id[n]) });
+        FT.state.unions[u.id] = u;
+      });
+      FT.autoArrange();
+      FT.render();
+      const people = FT.peopleList();
+      // Any partner line that crosses a card's box at card height is passing
+      // behind it, which is exactly the ambiguity we set out to remove.
+      let through = 0;
+      document.querySelectorAll('#edges path.edge[data-kind="partner"]').forEach((path) => {
+        const len = path.getTotalLength();
+        for (let i = 0; i <= 40; i++) {
+          const pt = path.getPointAtLength((len * i) / 40);
+          const u = FT.state.unions[path.dataset.union];
+          people.forEach((q) => {
+            if (u.partners.indexOf(q.id) >= 0) return;
+            if (pt.x > q.x + 2 && pt.x < q.x + FT.CARD_W - 2 &&
+                pt.y > q.y + 2 && pt.y < q.y + FT.CARD_H - 2) through++;
+          });
+        }
+      });
+      return through;
+    });
+    t.ok(routed === 0, 'no partner line passes through an unrelated card (' + routed + ' points inside)');
+
+    // Put the sample family back for the sections that follow.
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+    await page.click('[data-action="demo"]');
+    await page.waitForTimeout(600);
+
     t.section('a cross-generation partner draws differently');
     await page.evaluate(() => {
       const ids = Object.keys(FT.state.people);
@@ -340,7 +459,7 @@ module.exports = async function (t, h) {
     // out of its card and across the neighbouring one. Build a deliberately
     // hostile tree and measure every drawn glyph against the card it belongs to.
     const measured = await page.evaluate(() => {
-      const D = { w: 340, h: 244 };
+      const D = { w: 340, h: 268 };
       const tree = FT.newTree('Overflow torture');
       const mk = (attrs) => {
         const p = FT.newPerson(attrs);
@@ -352,6 +471,7 @@ module.exports = async function (t, h) {
         x: 0, y: 0,
         birth: '1921-03-14', death: '1998-11-02',
         birthplace: 'Sinj',
+        birthSurname: 'Kovačević-Buljan',
         // exactly what broke it: one word with no spaces at all
         knownFor: 'marinparin'.repeat(14),
       });
@@ -374,8 +494,11 @@ module.exports = async function (t, h) {
 
       const worst = { over: 0, text: '' };
       let checked = 0;
+      let collisions = 0;
+      let clash = '';
       let brokenWord = false;
       host.querySelectorAll('g[data-person]').forEach((card) => {
+        const boxes = [];
         card.querySelectorAll('text').forEach((t) => {
           const bb = t.getBBox();
           checked++;
@@ -385,14 +508,33 @@ module.exports = async function (t, h) {
             worst.text = t.textContent.slice(0, 40);
           }
           if (/^marinparin/.test(t.textContent) && t.textContent.length < 120) brokenWord = true;
+          boxes.push({ bb, text: t.textContent });
         });
+        // A label landing on its own value, or a row on the section below it,
+        // is just as broken as text leaving the card.
+        for (let i = 0; i < boxes.length; i++) {
+          for (let j = i + 1; j < boxes.length; j++) {
+            const a = boxes[i].bb;
+            const b = boxes[j].bb;
+            if (a.x < b.x + b.width - 0.5 && a.x + a.width > b.x + 0.5 &&
+                a.y < b.y + b.height - 0.5 && a.y + a.height > b.y + 0.5) {
+              collisions++;
+              if (!clash) clash = boxes[i].text.slice(0, 18) + ' / ' + boxes[j].text.slice(0, 18);
+            }
+          }
+        }
       });
       const svg = host.innerHTML;
       host.remove();
-      return { worst, checked, brokenWord, hasEllipsis: /…/.test(svg) };
+      return { worst, checked, collisions, clash, brokenWord, hasEllipsis: /…/.test(svg) };
     });
 
     t.ok(measured.checked > 20, 'measured every text run on the cards (' + measured.checked + ')');
+    t.ok(
+      measured.collisions === 0,
+      'no two text runs sit on top of each other (' + measured.collisions +
+        (measured.clash ? ': ' + measured.clash : '') + ')'
+    );
     t.ok(
       measured.worst.over <= 1,
       'nothing spills out of its card (worst overhang ' +
