@@ -97,6 +97,30 @@ module.exports = async function (t, h) {
   t.ok(ok === false, 'reconnect reports failure');
   t.ok(FT.fileLink.statusFor(third.id).granted === false, 'and the link stays marked unusable');
 
+  t.section('the file is the truth, the browser copy is a cache');
+  // The realistic case: you edited on another machine yesterday, so the file is
+  // newer than what this browser cached. Opening must not push the stale copy.
+  const newer = fakeHandle('newer.json');
+  const fromElsewhere = FT.demoTree();
+  fromElsewhere.title = 'Edited yesterday elsewhere';
+  fromElsewhere.updatedAt = Date.now();
+  newer.state.contents = JSON.stringify(fromElsewhere);
+  newer.state.lastModified = Date.now() + 60000; // the file is ahead
+
+  FT.state.title = 'Stale local copy';
+  FT.state.updatedAt = Date.now() - 86400000;
+  await FT.fileLink.linkTo(FT.state.id, newer, { write: false });
+  const took = await FT.fileLink.adoptNewerFromDisk();
+  t.ok(took === true, 'a newer file is adopted on open');
+  t.ok(FT.state.title === 'Edited yesterday elsewhere', 'and its contents win');
+  t.ok(newer.state.writes === 0, 'the stale cache is never written over it');
+
+  // The other direction: our copy is current, so the file is left alone.
+  FT.state.updatedAt = Date.now() + 120000;
+  t.ok((await FT.fileLink.adoptNewerFromDisk()) === false, 'an older file is ignored');
+  t.ok(FT.state.title === 'Edited yesterday elsewhere', 'and the open tree is untouched');
+  await FT.fileLink.unlink(FT.state.id);
+
   t.section('the file changed on another computer');
   // What a synced folder does: the file is rewritten underneath us.
   const shared = fakeHandle('shared.json');

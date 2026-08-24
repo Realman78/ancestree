@@ -157,13 +157,43 @@
     }, 800);
   };
 
+  /* The file is the tree; the browser copy is only a cache of it. So whenever
+     we (re)gain access, take whichever is newer. One comparison, no conflict
+     story: a file edited on another machine simply wins. */
+  api.adoptNewerFromDisk = async function () {
+    const link = links[FT.state.id];
+    if (!link || !link.granted) return false;
+    try {
+      const file = await link.handle.getFile();
+      link.lastSeen = file.lastModified;
+      if (file.lastModified <= (FT.state.updatedAt || 0)) return false;
+      const doc = FT.normalize(JSON.parse(await file.text()));
+      doc.id = FT.state.id;
+      FT.adoptDocument(doc);
+      // Adopting saves, which would queue a write straight back to the file we
+      // just read. Drop it: there is nothing to send.
+      clearTimeout(saveTimer);
+      link.lastSeen = file.lastModified;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
   api.reconnect = async function (treeId) {
     const link = links[treeId];
     if (!link) return false;
     const ok = await ensurePermission(link, true);
     link.granted = ok;
     announce();
-    if (ok) await api.writeNow(treeId);
+    // Read before writing, or reconnecting would push a stale cache over a
+    // newer file.
+    if (ok && treeId === FT.state.id) {
+      const took = await api.adoptNewerFromDisk();
+      if (!took) await api.writeNow(treeId);
+    } else if (ok) {
+      await api.writeNow(treeId);
+    }
     return ok;
   };
 
@@ -198,8 +228,9 @@
       const file = await link.handle.getFile();
       const doc = FT.normalize(JSON.parse(await file.text()));
       doc.id = FT.state.id; // stay the same tree on the shelf
-      link.lastSeen = file.lastModified;
       FT.adoptDocument(doc);
+      clearTimeout(saveTimer); // same: do not echo it back
+      link.lastSeen = file.lastModified;
       FT.emit('hint', { text: 'Reloaded “' + link.name + '” from disk.' });
       return true;
     } catch (e) {
@@ -273,6 +304,10 @@
     }
     if (Object.keys(links).length) startPolling();
     announce();
+    // The file may have moved on since this browser last saw it.
+    if (await api.adoptNewerFromDisk()) {
+      FT.emit('hint', { text: 'Opened the newer version from ' + links[FT.state.id].name + '.' });
+    }
   };
 
   /* Ask the browser to stop treating this data as disposable. Without it,

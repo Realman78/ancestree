@@ -97,9 +97,12 @@ shows when it last saved. **Open a file…** goes the other way.
 This is also how you sync without an account. Put the file in a folder that
 already syncs — Dropbox, iCloud Drive, OneDrive, Syncthing — and the tree
 follows you between computers, with no service in the middle and nobody holding
-a copy of your diaries. If another machine rewrites the file while you have it
-open, the app notices and offers to reload rather than quietly overwriting the
-other version.
+a copy of your diaries.
+
+Once a tree is linked, **the file is the tree** — the browser's copy is just a
+cache of it. Whenever the app regains access to the file it takes whichever
+version is newer, so opening the app on your desktop picks up what you did on
+your laptop instead of pushing a week-old cache over it.
 
 Browsers re-ask for permission to write to a file after a restart, so the panel
 offers **Reconnect** instead of a prompt out of nowhere. This needs the File
@@ -158,10 +161,9 @@ test/             npm test — five jsdom suites plus a real-browser pass
   not survive clearing site data. The app asks for persistent storage so it is
   not evicted under disk pressure, but the real answer is to link the tree to a
   file, or to keep a backup.
-- **File syncing is last-write-wins.** Two machines editing the same file at once
-  will not merge; the app detects that the file changed and offers to reload,
-  which discards whichever side you do not keep. Good enough for one person on
-  several computers, not for two people at once.
+- **A linked file is for one person at a time.** Newer wins, and nothing is
+  merged, so this is for you moving between your own computers — not two people
+  editing one tree.
 - **No sharing.** To give someone a tree you send them the file. There is
   deliberately no upload, no link, and nothing holding copies of anyone's
   diaries — but equally no way for two people to work on the same tree.
