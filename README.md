@@ -3,7 +3,7 @@
 A family tree you can lay out by hand, where every person carries a diary of
 their life.
 
-Everything stays in your browser. No accounts, no server, no build step —
+Everything stays on your own machine. No accounts, no server, no build step —
 the dependencies in `package.json` are only for the tests.
 
 ## Run it
@@ -90,6 +90,26 @@ tree** opens an empty board — it never touches the one you were on — and eac
 tree is stored separately. Deleting one asks first, and that is the single
 action here that undo cannot reach.
 
+**Keeping a tree in a real file.** Open the shelf and use **Save to a file…**:
+from then on the tree writes itself to that file as you work, and the panel
+shows when it last saved. **Open a file…** goes the other way.
+
+This is also how you sync without an account. Put the file in a folder that
+already syncs — Dropbox, iCloud Drive, OneDrive, Syncthing — and the tree
+follows you between computers, with no service in the middle and nobody holding
+a copy of your diaries. If another machine rewrites the file while you have it
+open, the app notices and offers to reload rather than quietly overwriting the
+other version.
+
+Browsers re-ask for permission to write to a file after a restart, so the panel
+offers **Reconnect** instead of a prompt out of nowhere. This needs the File
+System Access API (Chrome, Edge, Opera); Safari and Firefox fall back to the
+export files below, and the panel says so rather than showing a button that
+cannot work.
+
+**Back up all trees** writes your whole shelf into one file. Import reads it
+back, so a new browser can be restored in one step.
+
 **Getting a tree out.** **Export** offers three forms:
 
 | | |
@@ -100,6 +120,7 @@ action here that undo cannot reach.
 
 **Import** reads JSON only — a picture cannot be turned back into a family tree
 — and always opens as a *new* tree, so an import can never overwrite your work.
+It takes either a single tree or a whole backup.
 
 There is no sharing feature. Send someone the JSON (or the picture) and they can
 open it themselves; nothing is uploaded anywhere, and there is no server holding
@@ -119,6 +140,7 @@ index.html        markup for the canvas, the book, the menus and dialogs
 styles.css        all of the styling
 js/state.js       the document, graph queries and edits, undo
 js/library.js     the shelf: many trees in localStorage, and migration
+js/filelink.js    linking a tree to a file on disk, autosave, sync detection
 js/photo.js       cropping and downscaling a picked file into a portrait
 js/layout.js      the "Tidy up" engine — generations, then a tidy x-pass
 js/tree.js        canvas: rendering, pan/zoom, dragging, snapping, edges
@@ -131,9 +153,15 @@ test/             npm test — five jsdom suites plus a real-browser pass
 
 ## What a prototype this size doesn't do yet
 
-- **Everything lives in one browser.** Trees are in `localStorage`, so they do
-  not follow you to another browser, another device, or survive clearing site
-  data. There is no sync and no accounts. Export is the only real backup.
+- **An unlinked tree lives in one browser only.** Trees are kept in
+  `localStorage`, which does not follow you to another browser or device and does
+  not survive clearing site data. The app asks for persistent storage so it is
+  not evicted under disk pressure, but the real answer is to link the tree to a
+  file, or to keep a backup.
+- **File syncing is last-write-wins.** Two machines editing the same file at once
+  will not merge; the app detects that the file changed and offers to reload,
+  which discards whichever side you do not keep. Good enough for one person on
+  several computers, not for two people at once.
 - **No sharing.** To give someone a tree you send them the file. There is
   deliberately no upload, no link, and nothing holding copies of anyone's
   diaries — but equally no way for two people to work on the same tree.
@@ -168,9 +196,9 @@ npx playwright install chromium   # once, for the browser suite
 npm test                          # or: npm test browser
 ```
 
-Six suites, run against a real instance of the app: the document model and
-layout, the tree shelf, the wired-up page, export/import, photos, and a
-real-Chromium pass.
+Seven suites, run against a real instance of the app: the document model and
+layout, the tree shelf, the wired-up page, export/import, the file link, photos,
+and a real-Chromium pass.
 
 That last one earns its keep. The first five run in `jsdom`, which does no
 layout and no hit-testing — it once reported a page as fine while every click

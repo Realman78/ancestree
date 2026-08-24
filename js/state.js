@@ -198,6 +198,7 @@
     const ok = FT.saveDoc(FT.state);
     if (ok) {
       storageWarned = false;
+      FT.emit('saved', { id: FT.state.id });
     } else if (!storageWarned) {
       // Usually the quota, now that photos live in the document. Say so once —
       // silently dropping saves would lose someone's writing.

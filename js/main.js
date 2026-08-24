@@ -8,6 +8,7 @@
 
   const hintText = document.getElementById('hintText');
   const hintUndo = document.getElementById('hintUndo');
+  const hintReload = document.getElementById('hintReload');
   const undoBtn = document.getElementById('undoBtn');
   const redoBtn = document.getElementById('redoBtn');
 
@@ -17,11 +18,12 @@
     // Destructive steps no longer ask first, so the way back has to be offered
     // at the moment of loss, not just in the toolbar.
     hintUndo.hidden = !payload.undo;
+    hintReload.hidden = !payload.reload;
     hint.classList.add('show');
     clearTimeout(hintTimer);
     hintTimer = setTimeout(function () {
       hint.classList.remove('show');
-    }, payload.undo ? 7000 : 3200);
+    }, payload.undo || payload.reload ? 9000 : 3200);
   });
 
   /* An in-app replacement for confirm(). The native one returns false when a
@@ -82,6 +84,11 @@
     FT.save();
   });
 
+  /* Every local save also goes to the linked file, coalesced. */
+  FT.on('saved', function () {
+    FT.fileLink.scheduleWrite();
+  });
+
   /* Swap in a whole document — a different tree, an import, or the sample. */
   FT.adoptDocument = function (doc) {
     FT.silently(function () {
@@ -139,10 +146,82 @@
   }
   FT.renderTreeList = renderTreeList;
 
+  const fileStatus = document.getElementById('fileStatus');
+  const fileActions = document.getElementById('fileActions');
+  const storageUse = document.getElementById('storageUse');
+
+  function renderFilePanel() {
+    const fl = FT.fileLink;
+    if (!fl.supported()) {
+      fileStatus.textContent =
+        'This browser cannot write straight to a file. Use “Back up all trees” ' +
+        'below, or Export, to keep a copy.';
+      fileActions.innerHTML = '';
+      return;
+    }
+    const st = fl.statusFor(FT.state.id);
+    if (!st.linked) {
+      fileStatus.textContent =
+        'Not linked. Link it to a file and this tree saves there as you work — ' +
+        'put that file in a synced folder and it follows you between computers.';
+      fileActions.innerHTML =
+        '<button class="mini-btn" data-action="linkFile">Save to a file…</button>' +
+        '<button class="mini-btn" data-action="openFile">Open a file…</button>';
+      return;
+    }
+    if (!st.granted) {
+      fileStatus.textContent =
+        'Linked to ' + st.name + ', but this browser needs permission again ' +
+        'after a restart.';
+      fileActions.innerHTML =
+        '<button class="mini-btn" data-action="reconnectFile">Reconnect</button>' +
+        '<button class="mini-btn" data-action="unlinkFile">Unlink</button>';
+      return;
+    }
+    fileStatus.textContent =
+      'Saving to ' + st.name + (st.savedAt ? ' — saved ' + agoText(st.savedAt) : '') + '.';
+    fileActions.innerHTML =
+      '<button class="mini-btn" data-action="reloadFile">Reload from disk</button>' +
+      '<button class="mini-btn" data-action="unlinkFile">Unlink</button>';
+  }
+
+  function agoText(ts) {
+    const secs = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (secs < 5) return 'just now';
+    if (secs < 60) return secs + 's ago';
+    return Math.round(secs / 60) + ' min ago';
+  }
+
+  async function renderStorage() {
+    const est = await FT.fileLink.storageEstimate();
+    if (!est || !est.usage) {
+      storageUse.textContent = '';
+      return;
+    }
+    const mb = est.usage / (1024 * 1024);
+    storageUse.textContent = (mb < 0.1 ? '<0.1' : mb.toFixed(1)) + ' MB used in this browser';
+  }
+
+  FT.on('filelink', function () {
+    if (!treeMenu.hidden) renderFilePanel();
+  });
+
+  /* Someone else — another machine via a synced folder — rewrote the file. */
+  FT.on('filechanged', function (payload) {
+    FT.emit('hint', {
+      text: payload.name + ' changed on disk, probably from another computer.',
+      reload: true,
+    });
+  });
+
   function openTreeMenu(open) {
     treeMenu.hidden = !open;
     treeMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) renderTreeList();
+    if (open) {
+      renderTreeList();
+      renderFilePanel();
+      renderStorage();
+    }
   }
 
   treeMenuBtn.addEventListener('click', function (e) {
@@ -333,6 +412,35 @@
     import: function () {
       importInput.click();
     },
+    linkFile: async function () {
+      await FT.fileLink.pickAndLink();
+      renderFilePanel();
+    },
+    openFile: async function () {
+      await FT.fileLink.openAndLink();
+      renderFilePanel();
+    },
+    reconnectFile: async function () {
+      const ok = await FT.fileLink.reconnect(FT.state.id);
+      FT.emit('hint', {
+        text: ok ? 'Reconnected — saving to disk again.' : 'Permission was not granted.',
+      });
+      renderFilePanel();
+    },
+    reloadFile: async function () {
+      await FT.fileLink.reloadFromDisk();
+      renderFilePanel();
+    },
+    unlinkFile: async function () {
+      await FT.fileLink.unlink(FT.state.id);
+      FT.emit('hint', { text: 'Unlinked. This tree now lives only in this browser.' });
+      renderFilePanel();
+    },
+    backupAll: function () {
+      if (FT.exportAll()) {
+        FT.emit('hint', { text: 'Backed up every tree into one file.' });
+      }
+    },
     /* A new tree never overwrites anything — that is the point of the shelf. */
     newTree: function () {
       FT.save();
@@ -384,11 +492,18 @@
     importInput.value = '';
     if (!file) return;
     // Imports open as their own tree rather than replacing the current one.
-    FT.importFile(file, function (doc) {
+    FT.importFile(file, function (trees) {
       FT.save();
-      doc.id = FT.uid('t');
-      FT.adoptDocument(doc);
-      FT.emit('hint', { text: 'Imported “' + doc.title + '” as a new tree.' });
+      trees.forEach(function (doc) {
+        doc.id = FT.uid('t');
+        FT.saveDoc(doc);
+      });
+      FT.adoptDocument(trees[trees.length - 1]);
+      FT.emit('hint', {
+        text: trees.length === 1
+          ? 'Imported “' + trees[0].title + '” as a new tree.'
+          : 'Restored ' + trees.length + ' trees from that backup.',
+      });
     });
   });
 
@@ -435,10 +550,13 @@
 
   (async function boot() {
     FT.migrateLegacy(); // one-time move from the single-tree era
+    // Ask the browser not to treat this as disposable cache.
+    FT.fileLink.requestPersistence();
 
     const saved = FT.pickStartupDoc();
     if (saved) {
       FT.adoptDocument(saved);
+      FT.fileLink.restore(); // reattach any file this tree was linked to
       return;
     }
 

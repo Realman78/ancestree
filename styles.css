@@ -113,8 +113,8 @@ body {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  width: 300px;
-  max-height: 60vh;
+  width: 336px;
+  max-height: 70vh;
   overflow-y: auto;
   background: var(--paper-2);
   border: 1px solid var(--line);
@@ -1125,4 +1125,30 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ------------------------------------------------- the file link panel */
+
+.file-panel {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line-soft);
+}
+.file-status {
+  margin: 0;
+  padding: 2px 8px 8px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+.file-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 8px; }
+
+.storage-foot { align-items: center; justify-content: space-between; flex-wrap: nowrap; }
+.storage-foot .mini-btn { white-space: nowrap; }
+.storage-use {
+  font-size: 10.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: right;
+  line-height: 1.3;
 }

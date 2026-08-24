@@ -65,12 +65,26 @@ module.exports = async function (t, h) {
   doc.title = 'Imported line';
   const file = new w.File([JSON.stringify(doc)], 'tree.json', { type: 'application/json' });
   await new Promise(function (resolve) {
-    FT.importFile(file, function (parsedDoc) {
-      t.ok(parsedDoc.title === 'Imported line', 'a JSON tree is read back');
-      t.ok(Object.keys(parsedDoc.people).length === 9, 'with everyone in it');
+    FT.importFile(file, function (trees) {
+      t.ok(Array.isArray(trees) && trees.length === 1, 'a single export yields one tree');
+      t.ok(trees[0].title === 'Imported line', 'read back by name');
+      t.ok(Object.keys(trees[0].people).length === 9, 'with everyone in it');
       resolve();
     });
   });
+
+  t.section('backing up every tree at once');
+  const archive = {
+    kind: 'heirloom-archive',
+    version: 1,
+    trees: [FT.demoTree(), Object.assign(FT.demoTree(), { title: 'Second line' })],
+  };
+  const many = FT.readTrees(JSON.stringify(archive));
+  t.ok(many.length === 2, 'an archive restores every tree in it');
+  t.ok(many[1].title === 'Second line', 'each keeping its own name');
+  t.ok(FT.readTrees(JSON.stringify(FT.demoTree())).length === 1, 'and a plain export still works');
+  t.ok(FT.readTrees(JSON.stringify({ kind: 'heirloom-archive', version: 1, trees: [] })).length === 0,
+    'an empty archive yields nothing rather than a blank tree');
 
   await new Promise(function (resolve) {
     FT.importFile(new w.File(['not json at all'], 'x.json', { type: 'application/json' }), function () {

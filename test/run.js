@@ -11,6 +11,7 @@ const SUITES = [
   { name: 'library', file: './library.test.js' },
   { name: 'app', file: './app.test.js' },
   { name: 'export', file: './export.test.js' },
+  { name: 'filelink', file: './filelink.test.js' },
   { name: 'photo', file: './photo.test.js' },
   { name: 'browser', file: './browser.test.js', needsBrowser: true },
 ];

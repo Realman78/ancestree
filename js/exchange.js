@@ -37,26 +37,64 @@
     );
   };
 
+  /* onDone receives an array: one tree for a plain export, many for a backup. */
   FT.importFile = function (file, onDone) {
     const reader = new FileReader();
     reader.onload = function () {
-      let doc = null;
+      let trees = [];
       try {
-        doc = FT.normalize(JSON.parse(reader.result));
+        trees = FT.readTrees(reader.result);
       } catch (e) {
         FT.emit('hint', { text: 'That file could not be read as a family tree.' });
         return;
       }
-      if (!Object.keys(doc.people).length) {
+      if (!trees.length) {
         FT.emit('hint', { text: 'That file has no people in it.' });
         return;
       }
-      if (onDone) onDone(doc);
+      if (onDone) onDone(trees);
     };
     reader.onerror = function () {
       FT.emit('hint', { text: 'That file could not be read.' });
     };
     reader.readAsText(file);
+  };
+
+  // ------------------------------------------------ every tree in one file
+
+  const ARCHIVE_KIND = 'heirloom-archive';
+
+  /* One file holding the whole shelf. The account-free equivalent of a backup:
+     keep it somewhere safe and any browser can be restored from it. */
+  FT.exportAll = function () {
+    const trees = FT.listDocs()
+      .map(function (row) {
+        return FT.loadDoc(row.id);
+      })
+      .filter(Boolean);
+    if (!trees.length) {
+      FT.emit('hint', { text: 'There are no trees to back up yet.' });
+      return false;
+    }
+    download(
+      new Blob([JSON.stringify({ kind: ARCHIVE_KIND, version: 1, trees: trees }, null, 2)], {
+        type: 'application/json',
+      }),
+      'heirloom-backup-' + new Date().toISOString().slice(0, 10) + '.json'
+    );
+    return true;
+  };
+
+  /* Accepts either an archive or a single tree, so one Import can take both. */
+  FT.readTrees = function (text) {
+    const raw = JSON.parse(text);
+    if (raw && raw.kind === ARCHIVE_KIND && Array.isArray(raw.trees)) {
+      return raw.trees.map(FT.normalize).filter(function (doc) {
+        return Object.keys(doc.people).length;
+      });
+    }
+    const one = FT.normalize(raw);
+    return Object.keys(one.people).length ? [one] : [];
   };
 
   // ------------------------------------------------------------------- SVG

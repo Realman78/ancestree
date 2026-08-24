@@ -35,7 +35,16 @@
       <ul id="treeList" class="tree-list"></ul>
       <div class="tree-menu-foot">
         <button class="mini-btn" data-action="newTree">+ New tree</button>
-        <button class="mini-btn" data-action="import">Import JSON…</button>
+        <button class="mini-btn" data-action="import">Import…</button>
+      </div>
+      <div class="file-panel">
+        <div class="tree-menu-head">This tree on disk</div>
+        <p id="fileStatus" class="file-status"></p>
+        <div id="fileActions" class="file-actions"></div>
+      </div>
+      <div class="tree-menu-foot storage-foot">
+        <button class="mini-btn" data-action="backupAll">Back up all trees</button>
+        <span id="storageUse" class="storage-use"></span>
       </div>
     </div>
   </div>
@@ -133,6 +142,7 @@
 <div id="hint" class="hint" role="status" aria-live="polite">
   <span id="hintText"></span>
   <button id="hintUndo" class="hint-undo" data-action="undo" hidden>Undo</button>
+  <button id="hintReload" class="hint-undo" data-action="reloadFile" hidden>Reload</button>
 </div>
 
 <footer class="statusbar">
@@ -166,6 +176,7 @@
 
 <script src="js/state.js"></script>
 <script src="js/library.js"></script>
+<script src="js/filelink.js"></script>
 <script src="js/photo.js"></script>
 <script src="js/layout.js"></script>
 <script src="js/tree.js"></script>
