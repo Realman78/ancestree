@@ -1272,3 +1272,33 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
   background: #fff;
 }
 .name-edit:focus { outline: none; box-shadow: 0 0 0 2px rgba(179,144,63,.25); }
+
+/* Relationships, listed in the book so they are findable without knowing to
+   click a connector on the canvas. */
+.rel-list { list-style: none; margin: 8px 0 22px; padding: 0; }
+.rel { padding: 7px 8px; border-left: 2px solid var(--line-soft); margin-bottom: 4px; }
+.rel-who {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--ink);
+}
+.rel-none { color: var(--ink-faint); font-style: italic; }
+.rel-kids { font-family: var(--ui); font-size: 11px; color: var(--ink-faint); }
+.rel-fields { display: flex; gap: 5px; margin-top: 5px; }
+.rel-fields select,
+.rel-fields input {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffdf7;
+  color: var(--ink);
+  min-width: 0;
+}
+.rel-fields input { width: 68px; }
+.rel-fields select:focus,
+.rel-fields input:focus { outline: none; border-color: var(--gold); background: #fff; }

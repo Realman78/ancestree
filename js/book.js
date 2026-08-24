@@ -180,6 +180,60 @@
       );
     };
 
+    /* Relationships live on the connector lines, which is fine once you know
+       to click one — but nobody thinks to. The book is where you look for a
+       person's facts, so they are editable here too. */
+    const unionsHtml = function () {
+      const list = FT.sortUnions(FT.unionsOf(p.id));
+      if (!list.length) return '';
+      const opts = [['married', 'Married'], ['partners', 'Partners'], ['ended', 'Ended']];
+      return (
+        '<div class="toc-head"><span>Relationships</span></div>' +
+        '<ul class="rel-list">' +
+        list
+          .map(function (u) {
+            const others = u.partners
+              .filter(function (q) {
+                return q !== p.id;
+              })
+              .map(function (q) {
+                return (FT.state.people[q] || {}).name || 'Unknown';
+              });
+            const kids = u.children.length;
+            return (
+              '<li class="rel">' +
+                '<div class="rel-who">' +
+                  (others.length
+                    ? FT.escapeHtml(others.join(' & '))
+                    : '<span class="rel-none">No partner recorded</span>') +
+                  (kids
+                    ? '<span class="rel-kids">' + kids +
+                      (kids === 1 ? ' child' : ' children') + '</span>'
+                    : '') +
+                '</div>' +
+                '<div class="rel-fields">' +
+                  '<select data-union-id="' + u.id + '" data-union-field="status" ' +
+                    'aria-label="Kind of relationship">' +
+                    opts.map(function (o) {
+                      return '<option value="' + o[0] + '"' +
+                        (o[0] === u.status ? ' selected' : '') + '>' + o[1] + '</option>';
+                    }).join('') +
+                  '</select>' +
+                  '<input data-union-id="' + u.id + '" data-union-field="date" ' +
+                    'value="' + FT.escapeHtml(u.date) + '" placeholder="from" ' +
+                    'aria-label="Year it began">' +
+                  '<input data-union-id="' + u.id + '" data-union-field="endDate" ' +
+                    'value="' + FT.escapeHtml(u.endDate) + '" placeholder="until" ' +
+                    'aria-label="Year it ended">' +
+                '</div>' +
+              '</li>'
+            );
+          })
+          .join('') +
+        '</ul>'
+      );
+    };
+
     const toc = entries.length
       ? entries
           .map(function (e) {
@@ -210,6 +264,7 @@
         genderField(p.gender) +
         clampField('Known for', 'knownFor', p.knownFor, 'A line or two about them') +
       '</div>' +
+      unionsHtml() +
       '<div class="toc-head"><span>Chapters</span>' +
         '<button class="mini-btn" id="addEntry">+ New chapter</button>' +
       '</div>' +
@@ -469,10 +524,31 @@
     if (personId && payload.id === personId) renderLeft();
   });
 
+  /* Both a select (change) and the text inputs (input) land here. */
+  function unionEdit(t) {
+    const u = FT.state.unions[t.dataset.unionId];
+    if (!u) return false;
+    const field = t.dataset.unionField;
+    FT.checkpoint('union:' + u.id + ':' + field);
+    u[field] = field === 'status' ? t.value : t.value.trim();
+    FT.state.updatedAt = Date.now();
+    FT.save();
+    FT.render(); // the caption on the canvas follows
+    return true;
+  }
+
+  overlay.addEventListener('change', function (ev) {
+    if (ev.target.dataset && ev.target.dataset.unionId) unionEdit(ev.target);
+  });
+
   overlay.addEventListener('input', function (ev) {
     const p = person();
     if (!p) return;
     const t = ev.target;
+    if (t.dataset && t.dataset.unionId) {
+      unionEdit(t);
+      return;
+    }
 
     if (t.dataset && t.dataset.field) {
       FT.checkpoint('field:' + personId + ':' + t.dataset.field);

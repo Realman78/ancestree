@@ -63,12 +63,20 @@ into one row of siblings, and where somebody has so many partners that one
 connector has to reach past a card, it is routed *under* the row so it visibly
 goes around rather than hiding behind.
 
-Select a relationship line to set what it was: **married**, **partners**, or
-**ended**, with the years it ran. The line is captioned (`m. 1948 – 1961`), an
+Set what a relationship was — **married**, **partners**, or **ended**, and the
+years it ran — either in the person's book under **Relationships**, or by
+selecting the line itself. The line is captioned (`m. 1948 – 1961`), an
 unmarried partnership is dashed, and one that ended carries the genealogical
 double-slash. Relationships order chronologically, so remarriages read left to
 right. Nothing is drawn when no dates are recorded, so trees that do not track
 this stay clean.
+
+**Two couples whose children share a row get their own bus depth.** Someone who
+marries into another family sits beside their spouse, so their own parents' line
+has to reach across the chart to collect them — at a shared depth that line
+merges with the other couple's and every child below looks like it belongs to
+whichever you happen to trace back to. Buses are packed into lanes per row so
+that cannot happen.
 
 **Where two connectors cross**, the horizontal one arcs over the other — the
 drafting convention, which reads as "these do not meet" without needing a legend

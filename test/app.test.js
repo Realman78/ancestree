@@ -178,6 +178,66 @@ module.exports = async function (t, h) {
   FT.autoArrange();
   FT.render();
 
+  t.section('two couples on one row keep separate child buses');
+  // A person who marries into another family is placed beside their spouse, so
+  // their own parents' bus has to reach across the chart to collect them. At
+  // the same depth as the other couple's bus the two merge, and every child
+  // hanging off either looks like it belongs to whichever you trace back to.
+  FT.adoptDocument(FT.newTree('Two families'));
+  const fid = {};
+  ['GpA', 'GmA', 'GpB', 'GmB', 'SonA', 'DauA', 'SonB', 'DauB'].forEach((n) => {
+    fid[n] = FT.addPerson({ name: n, x: 0, y: 0 }).id;
+  });
+  const mkU = (pp, cc) => {
+    const un = FT.newUnion({ partners: pp.map((n) => fid[n]), children: cc.map((n) => fid[n]) });
+    FT.state.unions[un.id] = un;
+    return un;
+  };
+  mkU(['GpA', 'GmA'], ['SonA', 'DauA']);
+  mkU(['GpB', 'GmB'], ['SonB', 'DauB']);
+  mkU(['SonA', 'DauB'], []); // marries across, pulling DauB away from her brother
+  FT.autoArrange();
+
+  const buses = FT.edgeGeometry()
+    .filter((e) => e.kind === 'child')
+    .reduce((acc, e) => {
+      const key = e.unionId;
+      const y = e.pts[1][1];
+      acc[key] = acc[key] || { y, min: Infinity, max: -Infinity };
+      acc[key].min = Math.min(acc[key].min, e.pts[1][0], e.pts[2][0]);
+      acc[key].max = Math.max(acc[key].max, e.pts[1][0], e.pts[2][0]);
+      return acc;
+    }, {});
+  const lanes = Object.values(buses);
+  let merged = 0;
+  for (let i = 0; i < lanes.length; i++)
+    for (let j = i + 1; j < lanes.length; j++)
+      if (Math.abs(lanes[i].y - lanes[j].y) < 1 &&
+          lanes[i].min < lanes[j].max && lanes[i].max > lanes[j].min) merged++;
+  t.ok(lanes.length >= 2, 'both couples have a child bus');
+  t.ok(merged === 0, 'no two overlapping buses share a depth (' + merged + ' merged)');
+
+  t.section('each child line is clickable on its own');
+  // Every child of a union shares the trunk and part of the bus, so hit targets
+  // built from the whole route sat on top of one another.
+  const shared = FT.unionList().find((u) => u.children.length === 2);
+  const childEdges = FT.edgeGeometry().filter(
+    (e) => e.kind === 'child' && e.unionId === shared.id);
+  t.ok(childEdges.length === 2, 'a two-child union draws two child lines');
+  t.ok(childEdges.every((e) => !!e.hitD), 'each with its own hit target');
+  t.ok(childEdges[0].hitD !== childEdges[1].hitD, 'and those targets differ');
+  t.ok(
+    childEdges.every((e) => e.hitD.indexOf('V' + FT.state.people[e.childId].y) > 0),
+    'each ending at its own child'
+  );
+  const partnerEdge = FT.edgeGeometry().find(
+    (e) => e.kind === 'partner' && e.unionId === shared.id);
+  t.ok(!!partnerEdge.hitExtra, 'the shared trunk belongs to the couple instead');
+
+  FT.adoptDocument(FT.normalize(FT.demoTree()));
+  FT.autoArrange();
+  FT.render();
+
   t.section('the book');
   const josip = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Josip Kovač');
   FT.openBook(josip);
@@ -196,6 +256,20 @@ module.exports = async function (t, h) {
     'typing writes through to the document'
   );
   t.ok(!$('#wordCount'), 'the chapter page has no word counter');
+
+  t.ok(!!$('.rel-list'), 'the book lists the relationships this person is in');
+  const relFrom = $('[data-union-field="date"]');
+  t.ok(!!relFrom, 'with a field for the year it began');
+  relFrom.value = '1948';
+  relFrom.dispatchEvent(new w.Event('input', { bubbles: true }));
+  t.ok(
+    FT.unionList().some((u) => u.date === '1948'),
+    'so a marriage date can be set without hunting for the connector line'
+  );
+  const relStatus = $('[data-union-field="status"]');
+  relStatus.value = 'ended';
+  relStatus.dispatchEvent(new w.Event('change', { bubbles: true }));
+  t.ok(FT.unionList().some((u) => u.status === 'ended'), 'and the kind of relationship too');
 
   const surname = $('[data-field="birthSurname"]');
   t.ok(!!surname, 'the book has a field for the surname someone was born with');

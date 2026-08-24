@@ -273,17 +273,6 @@
     const people = lay.people || FT.state.people;
     const CARD_W = lay.cardW || FT.CARD_W;
     const CARD_H = lay.cardH || FT.CARD_H;
-    const out = [];
-
-    /* Two families from the same parent would otherwise drop onto one bus at
-       the same depth and read as a single set of siblings. Give each union its
-       own depth, ordered by when it began. */
-    const depth = {};
-    Object.keys(FT.state.people).forEach(function (pid) {
-      FT.sortUnions(FT.unionsOf(pid)).forEach(function (u, i) {
-        depth[u.id] = Math.max(depth[u.id] || 0, i);
-      });
-    });
 
     /* Is another card parked between these two? Then a straight bar between
        them would pass behind it, and the pair would look unrelated while the
@@ -299,6 +288,8 @@
       });
     };
 
+    // --- pass 1: where each union hangs from, and how wide its bus must be ---
+    const plan = [];
     FT.unionList().forEach(function (u) {
       const partners = u.partners
         .map(function (id) {
@@ -307,23 +298,25 @@
         .filter(Boolean);
       if (!partners.length) return;
 
-      let anchorX, anchorY;
-      let labelY = 0;
-      let crossGen = false;
-      let pts = null;
+      const children = u.children
+        .map(function (id) {
+          return people[id];
+        })
+        .filter(Boolean);
+
+      const e = { u: u, partners: partners, children: children };
 
       if (partners.length >= 2) {
         const a = partners[0];
         const b = partners[1];
-        crossGen = FT.isCrossGenerationUnion(u);
+        e.crossGen = FT.isCrossGenerationUnion(u);
         const midY = (a.y + b.y) / 2 + CARD_H / 2;
         const leftP = a.x <= b.x ? a : b;
         const rightP = a.x <= b.x ? b : a;
         const x1 = leftP.x + CARD_W;
         const x2 = rightP.x;
-        let d;
 
-        if (crossGen) {
+        if (e.crossGen) {
           // Rows apart: a squared-off bar would stride across whole generations
           // and read as a mistake, so curve between the facing edges instead.
           const sx = x1;
@@ -331,71 +324,133 @@
           const ex = x2 > x1 ? x2 : rightP.x + CARD_W;
           const ey = rightP.y + CARD_H / 2;
           const bow = Math.max(70, Math.abs(ex - sx) / 2);
-          d = 'M' + sx + ' ' + sy +
-              'C' + (sx + bow) + ' ' + sy + ',' + (ex - bow) + ' ' + ey + ',' + ex + ' ' + ey;
+          e.curve =
+            'M' + sx + ' ' + sy +
+            'C' + (sx + bow) + ' ' + sy + ',' + (ex - bow) + ' ' + ey + ',' + ex + ' ' + ey;
           // A cubic with horizontal handles passes through the midpoint of its
           // endpoints at t=0.5.
-          anchorX = (sx + ex) / 2;
-          anchorY = (sy + ey) / 2;
-          labelY = anchorY - 12;
+          e.anchorX = (sx + ex) / 2;
+          e.anchorY = (sy + ey) / 2;
+          e.labelY = e.anchorY - 12;
         } else if (x2 > x1 && !blocked(leftP, rightP)) {
-          pts = [
+          e.pts = [
             [x1, leftP.y + CARD_H / 2],
             [(x1 + x2) / 2, leftP.y + CARD_H / 2],
             [(x1 + x2) / 2, midY],
             [x2, midY],
             [x2, rightP.y + CARD_H / 2],
           ];
-          anchorX = (a.x + b.x) / 2 + CARD_W / 2;
-          anchorY = midY;
+          e.anchorX = (a.x + b.x) / 2 + CARD_W / 2;
+          e.anchorY = midY;
           // Beside the line there is only the gap between two cards, and the
           // edges are painted behind them — so anything longer than that gets
           // clipped. Caption it in the open space just below instead.
-          labelY = Math.max(a.y, b.y) + CARD_H + 15;
+          e.labelY = Math.max(a.y, b.y) + CARD_H + 15;
         } else {
           // Either the cards overlap (the bar would run backwards) or somebody
           // is sitting between them. Take the connector under the row so it
           // visibly goes around rather than hiding behind.
-          const underY =
-            Math.max(a.y, b.y) + CARD_H + 26 + (depth[u.id] || 0) * 14;
-          pts = [
+          const underY = Math.max(a.y, b.y) + CARD_H + 26;
+          e.pts = [
             [leftP.x + CARD_W / 2, leftP.y + CARD_H],
             [leftP.x + CARD_W / 2, underY],
             [rightP.x + CARD_W / 2, underY],
             [rightP.x + CARD_W / 2, rightP.y + CARD_H],
           ];
-          anchorX = (leftP.x + rightP.x) / 2 + CARD_W / 2;
-          anchorY = underY;
-          labelY = underY + 15;
+          e.anchorX = (leftP.x + rightP.x) / 2 + CARD_W / 2;
+          e.anchorY = underY;
+          e.labelY = underY + 15;
         }
-
-        out.push({
-          kind: 'partner', unionId: u.id, childId: null, d: d, pts: pts,
-          crossGen: crossGen,
-          status: u.status, label: FT.unionLabel(u),
-          labelPos: { x: anchorX, y: labelY },
-          mark: { x: anchorX, y: anchorY }, mid: { x: anchorX, y: anchorY },
-        });
       } else {
-        anchorX = partners[0].x + CARD_W / 2;
-        anchorY = partners[0].y + CARD_H;
+        e.anchorX = partners[0].x + CARD_W / 2;
+        e.anchorY = partners[0].y + CARD_H;
       }
 
-      const children = u.children
-        .map(function (id) {
-          return people[id];
+      if (children.length) {
+        const centres = children.map(function (c) {
+          return c.x + CARD_W / 2;
+        });
+        e.topChildY = Math.min.apply(null, children.map(function (c) {
+          return c.y;
+        }));
+        e.busMin = Math.min.apply(null, centres.concat([e.anchorX]));
+        e.busMax = Math.max.apply(null, centres.concat([e.anchorX]));
+      }
+      plan.push(e);
+    });
+
+    // --- pass 2: give overlapping buses their own depth ---------------------
+    /* Two couples whose children sit on the same row will otherwise drop onto
+       buses at exactly the same height. Where those buses also overlap left to
+       right they merge into one line, and every child hanging off either of
+       them looks like it belongs to whichever couple you happen to trace back
+       to. A married-in child makes this routine: their parents' bus has to
+       reach across the whole chart to collect them.
+
+       So pack the buses into lanes per row, like non-overlapping intervals. */
+    const CLEAR = 10;
+    const LANE_H = 22;
+    const byRow = {};
+    plan.forEach(function (e) {
+      if (e.topChildY === undefined) return;
+      (byRow[e.topChildY] = byRow[e.topChildY] || []).push(e);
+    });
+    Object.keys(byRow).forEach(function (row) {
+      const laneEnd = [];
+      byRow[row]
+        .slice()
+        .sort(function (a, b) {
+          return a.busMin - b.busMin || a.busMax - b.busMax;
         })
-        .filter(Boolean);
-      if (!children.length) return;
+        .forEach(function (e) {
+          let lane = 0;
+          while (lane < laneEnd.length && laneEnd[lane] > e.busMin - CLEAR) lane++;
+          laneEnd[lane] = e.busMax;
+          e.lane = lane;
+        });
+    });
 
-      const topChildY = Math.min.apply(null, children.map(function (c) { return c.y; }));
-      // Each union's children ride their own bus, so two families from one
-      // parent stay visibly separate.
-      const lift = (depth[u.id] || 0) * 18;
-      const busY = Math.max(anchorY + 28, topChildY - 40 - lift);
+    // --- pass 3: emit -------------------------------------------------------
+    const out = [];
+    plan.forEach(function (e) {
+      const u = e.u;
+      let busY = 0;
+      if (e.topChildY !== undefined) {
+        busY = Math.max(e.anchorY + 28, e.topChildY - 40 - (e.lane || 0) * LANE_H);
+      }
+      // The drop from the couple down to their bus belongs to the union, so it
+      // is part of what you grab when you click the relationship.
+      const trunk =
+        e.children.length && e.partners.length >= 2
+          ? 'M' + e.anchorX + ' ' + e.anchorY + 'V' + busY
+          : '';
 
-      children.forEach(function (c) {
+      if (e.partners.length >= 2) {
+        const d = e.curve || routeToPath(e.pts, null);
+        out.push({
+          kind: 'partner',
+          unionId: u.id,
+          childId: null,
+          d: d,
+          pts: e.pts || null,
+          hitExtra: trunk,
+          crossGen: !!e.crossGen,
+          status: u.status,
+          label: FT.unionLabel(u),
+          labelPos: { x: e.anchorX, y: e.labelY },
+          mark: { x: e.anchorX, y: e.anchorY },
+          mid: { x: e.anchorX, y: e.anchorY },
+        });
+      }
+
+      e.children.forEach(function (c) {
         const cx = c.x + CARD_W / 2;
+        // Only the part of the route unique to this child can be clicked: every
+        // child of a union shares the trunk and part of the bus, so hit targets
+        // built from the whole route sat on top of one another and the same
+        // child answered for all of them.
+        const towards = cx >= e.anchorX ? -1 : 1;
+        const stub = Math.min(18, Math.abs(cx - e.anchorX));
         out.push({
           kind: 'child',
           unionId: u.id,
@@ -404,8 +459,9 @@
           status: u.status,
           label: '',
           mark: null,
-          pts: [[anchorX, anchorY], [anchorX, busY], [cx, busY], [cx, c.y]],
-          mid: { x: (anchorX + cx) / 2, y: busY },
+          pts: [[e.anchorX, e.anchorY], [e.anchorX, busY], [cx, busY], [cx, c.y]],
+          hitD: 'M' + (cx + towards * stub) + ' ' + busY + 'H' + cx + 'V' + c.y,
+          mid: { x: (e.anchorX + cx) / 2, y: busY },
         });
       });
     });
@@ -431,7 +487,10 @@
         (e.status === 'partners' ? ' unwed' : '') +
         (isEdgeSelected(e.kind, e.unionId, e.childId) ? ' selected' : '');
       visible.push('<path class="' + cls + '"' + attrs + ' d="' + e.d + '"/>');
-      hits.push('<path class="edge-hit"' + attrs + ' d="' + e.d + '"/>');
+      hits.push(
+        '<path class="edge-hit"' + attrs + ' d="' +
+          (e.hitD || e.d) + (e.hitExtra || '') + '"/>'
+      );
       edgeMids[edgeKey(e.kind, e.unionId, e.childId)] = e.mid;
       if (e.mark) {
         marks.push({

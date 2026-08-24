@@ -4,3 +4,7 @@ shares/
 node_modules/
 *.log
 .DS_Store
+
+# Personal tree exports kept in the working directory
+temp
+*.tree.json
