@@ -1,4 +1,4 @@
-/* Heirloom — the life book: a two-page spread per person.
+/* Ancestree — the life book: a two-page spread per person.
    Left page is the profile and table of contents; right page is the open entry. */
 (function () {
   const FT = window.FT;
@@ -221,9 +221,11 @@
                   '</select>' +
                   '<input data-union-id="' + u.id + '" data-union-field="date" ' +
                     'value="' + FT.escapeHtml(u.date) + '" placeholder="from" ' +
+                    'inputmode="numeric" maxlength="4" ' +
                     'aria-label="Year it began">' +
                   '<input data-union-id="' + u.id + '" data-union-field="endDate" ' +
                     'value="' + FT.escapeHtml(u.endDate) + '" placeholder="until" ' +
+                    'inputmode="numeric" maxlength="4" ' +
                     'aria-label="Year it ended">' +
                 '</div>' +
               '</li>'
@@ -268,7 +270,13 @@
       '<div class="toc-head"><span>Chapters</span>' +
         '<button class="mini-btn" id="addEntry">+ New chapter</button>' +
       '</div>' +
-      '<ul class="toc">' + toc + '</ul>';
+      '<ul class="toc">' + toc + '</ul>' +
+      (entries.length
+        ? '<div class="toc-export">Export these chapters: ' +
+          '<button class="link-btn" id="chaptersMd">Markdown</button>' +
+          '<span class="dot">·</span>' +
+          '<button class="link-btn" id="chaptersPdf">PDF</button></div>'
+        : '');
 
     markClipped();
   }
@@ -445,6 +453,14 @@
       renderRight(true);
       return;
     }
+    if (e.target.closest('#chaptersMd')) {
+      FT.exportChaptersMarkdown(personId);
+      return;
+    }
+    if (e.target.closest('#chaptersPdf')) {
+      FT.printChapters(personId);
+      return;
+    }
     if (e.target.closest('#removePhoto')) {
       FT.clearPhoto(personId);
       return;
@@ -530,7 +546,15 @@
     if (!u) return false;
     const field = t.dataset.unionField;
     FT.checkpoint('union:' + u.id + ':' + field);
-    u[field] = field === 'status' ? t.value : t.value.trim();
+    if (field === 'status') {
+      u.status = t.value;
+    } else {
+      // Strip anything that is not a digit, in place, so the box can only ever
+      // hold a year.
+      const cleaned = FT.cleanYear(t.value);
+      if (t.value !== cleaned) t.value = cleaned;
+      u[field] = cleaned;
+    }
     FT.state.updatedAt = Date.now();
     FT.save();
     FT.render(); // the caption on the canvas follows

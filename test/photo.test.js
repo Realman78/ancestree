@@ -33,8 +33,8 @@ module.exports = async function (t, h) {
   await h.wait(200);
 
   const file = new w.File([new Uint8Array(buf)], 'gran.png', { type: 'image/png' });
-  const josip = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Josip Kovač');
-  const ana = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Ana Kovač');
+  const josip = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Joseph Miller');
+  const ana = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Ruth Miller');
 
   t.section('downscaling');
   const data = await FT.readPhoto(file);
@@ -67,9 +67,9 @@ module.exports = async function (t, h) {
   FT.render();
   FT.render();
   t.ok(card.querySelector('.avatar img') === imgBefore, 'repeated renders do not rebuild it (no flicker)');
-  FT.state.people[josip].name = 'Josip Kovač Sr.';
+  FT.state.people[josip].name = 'Joseph Miller Sr.';
   FT.render();
-  t.ok(card.querySelector('.name').textContent === 'Josip Kovač Sr.', 'but a real change still re-renders');
+  t.ok(card.querySelector('.name').textContent === 'Joseph Miller Sr.', 'but a real change still re-renders');
 
   t.section('drag onto a card');
   const target = $$('.card').find((c) => c.dataset.id === ana);
@@ -85,7 +85,7 @@ module.exports = async function (t, h) {
   t.ok(!!$('#pageLeft .portrait-img'), 'the book shows the portrait');
   t.ok(!!$('#pageLeft .photo-input'), 'and offers a picker');
   const nameEl = $('#pageLeft .person-name');
-  nameEl.value = 'Josip K.';
+  nameEl.value = 'Joseph M.';
   nameEl.dispatchEvent(new w.Event('input', { bubbles: true }));
   t.ok(!!$('#pageLeft .portrait-img'), 'renaming does not wipe the portrait');
 

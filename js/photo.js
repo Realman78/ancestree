@@ -1,7 +1,7 @@
-/* Heirloom — turning a picked file into a portrait.
+/* Ancestree — turning a picked file into a portrait.
 
-   Photos live inside the document itself (they travel in share links and export
-   files), so the original is never kept. Everything is cropped square and
+   Photos live inside the document itself (they travel in export files), so the
+   original is never kept. Everything is cropped square and
    downscaled to a thumbnail first: a 4 MB phone photo comes out around 15 KB. */
 (function () {
   const FT = window.FT;

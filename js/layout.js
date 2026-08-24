@@ -1,4 +1,4 @@
-/* Heirloom — generational layout ("tidy up") engine.
+/* Ancestree — generational layout ("tidy up") engine.
 
    Two passes:
      1. generations()  assigns every person a row, so partners share a row and a

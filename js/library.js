@@ -1,4 +1,4 @@
-/* Heirloom — the shelf: many trees in one browser.
+/* Ancestree — the shelf: many trees in one browser.
 
    Each tree is its own localStorage entry; a small index keeps the list so the
    picker never has to parse every document. Trees are independent — opening a
@@ -6,6 +6,9 @@
 (function () {
   const FT = window.FT;
 
+  /* These keys still say "heirloom" — the app's former name. Renaming them
+     would strand every tree already saved in somebody's browser, and the keys
+     are invisible, so they stay as they are. */
   const INDEX_KEY = 'heirloom.index.v1';
   const DOC_PREFIX = 'heirloom.doc.';
   const LAST_KEY = 'heirloom.last.v1';

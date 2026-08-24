@@ -1,4 +1,4 @@
-/* Heirloom — getting a tree in and out.
+/* Ancestree — getting a tree in and out.
 
    Out: JSON (the only lossless form — re-importable, keeps every diary entry),
         SVG (a vector drawing of the canvas), PNG (the same, rasterised).
@@ -58,6 +58,119 @@
       FT.emit('hint', { text: 'That file could not be read.' });
     };
     reader.readAsText(file);
+  };
+
+  // ------------------------------------------------------- one life's book
+
+  /* Chapters are the part of a tree worth reading rather than looking at, so
+     they come out as a document about one person, not as data. */
+  function personChapters(p) {
+    return p.entries.slice().sort(function (a, b) {
+      return String(a.date).localeCompare(String(b.date));
+    });
+  }
+
+  function chapterHeading(e) {
+    const from = FT.prettyDate(e.date);
+    const to = e.end ? FT.prettyDate(e.end) : '';
+    const when = to ? from + ' – ' + to : from;
+    const title = e.title || 'Untitled chapter';
+    return { when: when || 'Undated', title: title };
+  }
+
+  function personSubtitle(p) {
+    const bits = [];
+    const span = FT.lifespan(p);
+    if (span) bits.push(span);
+    if (p.birthSurname) bits.push(FT.bornAs(p));
+    if (p.birthplace) bits.push('of ' + p.birthplace);
+    return bits.join(' · ');
+  }
+
+  FT.chaptersMarkdown = function (personId) {
+    const p = FT.state.people[personId];
+    if (!p) return '';
+    const out = ['# ' + p.name];
+    const sub = personSubtitle(p);
+    if (sub) out.push('', '*' + sub + '*');
+    if (p.knownFor) out.push('', p.knownFor);
+
+    personChapters(p).forEach(function (e) {
+      const h = chapterHeading(e);
+      out.push('', '---', '', '## ' + h.title, '', '**' + h.when + '**');
+      if (e.body.trim()) out.push('', e.body.trim());
+    });
+
+    out.push('', '---', '', '*From ' + FT.state.title + '.*');
+    return out.join('\n') + '\n';
+  };
+
+  FT.exportChaptersMarkdown = function (personId) {
+    const p = FT.state.people[personId];
+    if (!p) return false;
+    if (!p.entries.length) {
+      FT.emit('hint', { text: 'There are no chapters to export yet.' });
+      return false;
+    }
+    download(
+      new Blob([FT.chaptersMarkdown(personId)], { type: 'text/markdown;charset=utf-8' }),
+      slug(p.name) + '-chapters.md'
+    );
+    return true;
+  };
+
+  /* A print view rather than a generated PDF: the browser's own print engine
+     typesets far better than anything we could bundle, and "Save as PDF" in the
+     print dialog produces the file. Nothing is added to the page permanently. */
+  FT.chaptersPrintHtml = function (personId) {
+    const p = FT.state.people[personId];
+    if (!p) return '';
+    const sub = personSubtitle(p);
+    const parts = [
+      '<header class="pr-head">',
+      '<h1>' + esc(p.name) + '</h1>',
+      sub ? '<p class="pr-sub">' + esc(sub) + '</p>' : '',
+      p.knownFor ? '<p class="pr-known">' + esc(p.knownFor) + '</p>' : '',
+      '</header>',
+    ];
+    personChapters(p).forEach(function (e) {
+      const h = chapterHeading(e);
+      parts.push(
+        '<section class="pr-chapter">',
+        '<h2>' + esc(h.title) + '</h2>',
+        '<p class="pr-when">' + esc(h.when) + '</p>',
+        '<div class="pr-body"><p>' +
+          esc(e.body.trim()).replace(/\n{2,}/g, '</p><p>').replace(/\n/g, '<br>') +
+          '</p></div>',
+        '</section>'
+      );
+    });
+    parts.push('<footer class="pr-foot">From ' + esc(FT.state.title) + '.</footer>');
+    return parts.join('');
+  };
+
+  FT.printChapters = function (personId) {
+    const p = FT.state.people[personId];
+    if (!p) return false;
+    if (!p.entries.length) {
+      FT.emit('hint', { text: 'There are no chapters to print yet.' });
+      return false;
+    }
+    const root = document.getElementById('printRoot');
+    root.innerHTML = FT.chaptersPrintHtml(personId);
+    document.body.classList.add('printing');
+
+    const done = function () {
+      document.body.classList.remove('printing');
+      root.innerHTML = '';
+      window.removeEventListener('afterprint', done);
+    };
+    window.addEventListener('afterprint', done);
+    // Some browsers never fire afterprint; do not leave the page stuck.
+    setTimeout(done, 60000);
+
+    window.print();
+    return true;
   };
 
   // ------------------------------------------------ every tree in one file

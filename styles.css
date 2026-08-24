@@ -1,4 +1,4 @@
-/* Heirloom — a warm, papery family-tree workspace. */
+/* Ancestree — a warm, papery family-tree workspace. */
 
 :root {
   --ink:        #2c2620;
@@ -1276,7 +1276,14 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
 /* Relationships, listed in the book so they are findable without knowing to
    click a connector on the canvas. */
 .rel-list { list-style: none; margin: 8px 0 22px; padding: 0; }
-.rel { padding: 7px 8px; border-left: 2px solid var(--line-soft); margin-bottom: 4px; }
+.rel {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  /* Set apart from the page so each relationship reads as its own block. */
+  background: rgba(180,150,90,.09);
+  border-left: 2px solid var(--line);
+  border-radius: 0 7px 7px 0;
+}
 .rel-who {
   display: flex;
   align-items: baseline;
@@ -1302,3 +1309,79 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
 .rel-fields input { width: 68px; }
 .rel-fields select:focus,
 .rel-fields input:focus { outline: none; border-color: var(--gold); background: #fff; }
+
+.toc-export {
+  margin: 10px 0 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.link-btn {
+  font: inherit;
+  font-size: 11.5px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--walnut);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.link-btn:hover { color: var(--walnut-dk); }
+.toc-export .dot { margin: 0 5px; }
+
+/* ------------------------------------------------------ printing a life */
+
+.print-root { display: none; }
+
+@media print {
+  /* Only the chapters go on paper. */
+  body.printing > *:not(.print-root) { display: none !important; }
+  body.printing {
+    display: block;
+    overflow: visible;
+    background: #fff;
+  }
+  body.printing .print-root {
+    display: block;
+    font-family: var(--serif);
+    color: #1c1a17;
+    max-width: 100%;
+  }
+  .pr-head { margin-bottom: 28px; }
+  .pr-head h1 { font-size: 26pt; font-weight: 500; margin: 0 0 6px; }
+  .pr-sub { margin: 0 0 8px; font-size: 10pt; color: #555; letter-spacing: .03em; }
+  .pr-known { margin: 0; font-size: 11pt; font-style: italic; color: #333; }
+
+  .pr-chapter {
+    /* Never split a chapter heading from the paragraph it belongs to. */
+    break-inside: avoid-page;
+    margin-bottom: 22px;
+  }
+  .pr-chapter h2 {
+    font-size: 15pt;
+    font-weight: 500;
+    margin: 0 0 3px;
+    break-after: avoid-page;
+  }
+  .pr-when {
+    margin: 0 0 10px;
+    font-family: var(--ui);
+    font-size: 9pt;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: #777;
+    break-after: avoid-page;
+  }
+  .pr-body { font-size: 11.5pt; line-height: 1.65; }
+  .pr-body p { margin: 0 0 10px; }
+  .pr-foot {
+    margin-top: 30px;
+    padding-top: 10px;
+    border-top: 1px solid #ccc;
+    font-size: 9pt;
+    color: #777;
+  }
+  @page { margin: 20mm 18mm; }
+}

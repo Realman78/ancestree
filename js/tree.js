@@ -1,4 +1,4 @@
-/* Heirloom — canvas: rendering, pan/zoom, dragging with snap + alignment guides. */
+/* Ancestree — canvas: rendering, pan/zoom, dragging with snap + alignment guides. */
 (function () {
   const FT = window.FT;
 

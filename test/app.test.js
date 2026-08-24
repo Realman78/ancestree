@@ -28,7 +28,7 @@ module.exports = async function (t, h) {
   t.ok($$('.card .dates')[0].textContent.trim().length <= 12, 'cards show years, not full dates');
 
   t.section('selection and relationships');
-  const marko = $$('.card').find((c) => FT.state.people[c.dataset.id].name === 'Marko Kovač');
+  const marko = $$('.card').find((c) => FT.state.people[c.dataset.id].name === 'Robert Miller');
   FT.select(marko.dataset.id);
   t.ok($('#pill').hidden === false, 'the action pill appears on selection');
   t.ok($('.card.selected').dataset.id === marko.dataset.id, 'the selected card is marked');
@@ -133,13 +133,13 @@ module.exports = async function (t, h) {
   // from another union crosses it.
   FT.adoptDocument(FT.newTree('Three marriages'));
   const tid = {};
-  ['Josip', 'Ana', 'Marta', 'Vera', 'Ivan', 'Petar', 'Nina'].forEach((n) => {
+  ['Joseph', 'Ruth', 'Marta', 'Carol', 'Ivan', 'Petar', 'Grace'].forEach((n) => {
     tid[n] = FT.addPerson({ name: n, x: 0, y: 0 }).id;
   });
   [
-    [['Ana', 'Josip'], ['Ivan'], '1948'],
-    [['Josip', 'Marta'], ['Petar'], '1957'],
-    [['Josip', 'Vera'], ['Nina'], '1970'],
+    [['Ruth', 'Joseph'], ['Ivan'], '1948'],
+    [['Joseph', 'Marta'], ['Petar'], '1957'],
+    [['Joseph', 'Carol'], ['Grace'], '1970'],
   ].forEach(([pp, cc, dd]) => {
     const un = FT.newUnion({
       partners: pp.map((n) => tid[n]), children: cc.map((n) => tid[n]), date: dd,
@@ -239,10 +239,10 @@ module.exports = async function (t, h) {
   FT.render();
 
   t.section('the book');
-  const josip = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Josip Kovač');
+  const josip = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Joseph Miller');
   FT.openBook(josip);
   t.ok(!$('#bookOverlay').hidden, 'the book opens');
-  t.ok($('#pageLeft .person-name').value === 'Josip Kovač', 'the left page shows the person');
+  t.ok($('#pageLeft .person-name').value === 'Joseph Miller', 'the left page shows the person');
   t.ok($$('#pageLeft .toc-item').length === 2, 'chapters are listed in the contents');
   const entries = FT.state.people[josip].entries;
   t.ok($('#pageRight .entry-body').value === entries[entries.length - 1].body, 'the latest chapter opens');
@@ -273,14 +273,14 @@ module.exports = async function (t, h) {
 
   const surname = $('[data-field="birthSurname"]');
   t.ok(!!surname, 'the book has a field for the surname someone was born with');
-  surname.value = 'Buljan';
+  surname.value = 'Calloway';
   surname.dispatchEvent(new w.Event('input', { bubbles: true }));
-  t.ok(FT.state.people[josip].birthSurname === 'Buljan', 'and it saves through');
+  t.ok(FT.state.people[josip].birthSurname === 'Calloway', 'and it saves through');
 
   const nameEl = $('#pageLeft .person-name');
-  nameEl.value = 'Josip K.';
+  nameEl.value = 'Joseph M.';
   nameEl.dispatchEvent(new w.Event('input', { bubbles: true }));
-  t.ok(FT.state.people[josip].name === 'Josip K.', 'renaming updates the person');
+  t.ok(FT.state.people[josip].name === 'Joseph M.', 'renaming updates the person');
 
   const before = FT.state.people[josip].entries.length;
   $('#addEntry').click();
@@ -293,7 +293,7 @@ module.exports = async function (t, h) {
   FT.save();
   const reloaded = FT.loadDoc(FT.state.id);
   t.ok(!!reloaded, 'the open tree is written to its own storage entry');
-  t.ok(reloaded.people[josip].name === 'Josip K.', 'edits are saved');
+  t.ok(reloaded.people[josip].name === 'Joseph M.', 'edits are saved');
   t.ok(
     FT.listDocs().some((row) => row.id === FT.state.id),
     'and it appears on the shelf'

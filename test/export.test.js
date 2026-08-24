@@ -18,8 +18,8 @@ module.exports = async function (t, h) {
   const rects = (svg.match(/<rect [^>]*rx="12"/g) || []).length;
   t.ok(rects === people.length, 'one card per person (' + rects + '/' + people.length + ')');
   people.forEach(function (p) {
-    if (p.name === 'Josip Kovač') {
-      t.ok(svg.indexOf('Josip') >= 0, 'names are drawn as real text, not paths');
+    if (p.name === 'Joseph Miller') {
+      t.ok(svg.indexOf('Joseph') >= 0, 'names are drawn as real text, not paths');
     }
   });
 
@@ -90,7 +90,7 @@ module.exports = async function (t, h) {
   t.ok(FT.fitLines('', F, LIMIT, 2).length === 0, 'empty text yields no lines');
   t.ok(FT.fitLines('   ', F, LIMIT, 2).length === 0, 'whitespace yields no lines');
 
-  const oneLine = FT.fitLines('A Very Long Place Name In The Middle Of Nowhere, Croatia',
+  const oneLine = FT.fitLines('A Very Long Place Name In The Middle Of Nowhere, Iowa',
     F, LIMIT, 1);
   t.ok(oneLine.length === 1 && fits(oneLine), 'a single-line field is held to one line');
   t.ok(oneLine[0].endsWith('…'), 'and ellipsed');
@@ -100,10 +100,10 @@ module.exports = async function (t, h) {
   // An earlier section renamed the first person to test escaping; put it back
   // so the card reads normally here.
   const josip = Object.keys(FT.state.people).find((i) => FT.state.people[i].birth === '1921-03-14');
-  FT.state.people[josip].name = 'Josip Kovač';
+  FT.state.people[josip].name = 'Joseph Miller';
   FT.state.people[josip].knownFor =
     'Village blacksmith for forty years, who reopened the forge after the war ' +
-    'and made the iron gate that still stands in the square at Sinj.';
+    'and made the iron gate that still stands on the courthouse lawn.';
   const detail = FT.buildDetailedSvg();
 
   const dParsed = new w.DOMParser().parseFromString(detail, 'image/svg+xml');
@@ -116,11 +116,11 @@ module.exports = async function (t, h) {
   t.ok(/BORN/.test(detail) && /DIED/.test(detail), 'has Born and Died labels');
   t.ok(/14 March 1921/.test(detail), 'dates carry the day and month, not just the year');
   t.ok(/2 November 1998/.test(detail), 'including the death date');
-  t.ok(/FROM/.test(detail) && /Sinj, Croatia/.test(detail), 'shows where they were from');
+  t.ok(/FROM/.test(detail) && /Cedar Falls, Iowa/.test(detail), 'shows where they were from');
   t.ok(/KNOWN FOR/.test(detail), 'has a known-for section');
-  FT.state.people[josip].birthSurname = 'Kovačić';
+  FT.state.people[josip].birthSurname = 'Calloway';
   const withSurname = FT.buildDetailedSvg();
-  t.ok(/BORN AS/.test(withSurname) && /Kovačić/.test(withSurname),
+  t.ok(/BORN AS/.test(withSurname) && /Calloway/.test(withSurname),
     'shows the surname someone was born with');
   FT.state.people[josip].birthSurname = '';
   t.ok(/2 CHAPTERS/.test(detail) && /1 CHAPTER/.test(detail),
@@ -165,12 +165,56 @@ module.exports = async function (t, h) {
   t.ok(/Unknown Ancestor/.test(bareSvg), 'but the person is still drawn');
 
   t.section('detailed SVG escaping');
-  FT.state.people[josip].birthplace = 'Sinj <script>alert(1)</script>';
+  FT.state.people[josip].birthplace = 'Cedar Falls <script>alert(1)</script>';
   const hostileDetail = FT.buildDetailedSvg();
   t.ok(hostileDetail.indexOf('<script>') < 0, 'markup in a field cannot break out');
   t.ok(!new w.DOMParser().parseFromString(hostileDetail, 'image/svg+xml')
     .querySelector('parsererror'), 'and the file stays well-formed');
-  FT.state.people[josip].birthplace = 'Sinj, Croatia';
+  FT.state.people[josip].birthplace = 'Cedar Falls, Iowa';
+
+  t.section("one life's chapters");
+  const writer = Object.keys(FT.state.people).find(
+    (i) => FT.state.people[i].entries.length >= 2);
+  const md = FT.chaptersMarkdown(writer);
+  const who = FT.state.people[writer];
+  t.ok(md.startsWith('# ' + who.name), 'the markdown opens with the person');
+  t.ok((md.match(/^## /gm) || []).length === who.entries.length,
+    'one heading per chapter (' + who.entries.length + ')');
+  who.entries.forEach((e) => {
+    if (e.body.trim()) {
+      t.ok(md.indexOf(e.body.trim().split('\n')[0]) > 0, 'chapter text is carried over');
+    }
+  });
+  t.ok(/\*\*\d+ \w+ \d{4}\*\*/.test(md), 'dates are written out in full');
+  t.ok(md.indexOf(FT.state.title) > 0, 'and the tree it came from is credited');
+
+  // It is one person's book, not the whole family's.
+  const others = FT.peopleList().filter((p) => p.id !== writer && p.entries.length);
+  others.forEach((p) => {
+    p.entries.forEach((e) => {
+      if (e.title) t.ok(md.indexOf(e.title) < 0, "another person's chapters are left out");
+    });
+  });
+
+  const printed = FT.chaptersPrintHtml(writer);
+  const pdoc = new w.DOMParser().parseFromString('<div>' + printed + '</div>', 'text/html');
+  t.ok(pdoc.querySelectorAll('.pr-chapter').length === who.entries.length,
+    'the print view has the same chapters');
+  t.ok(pdoc.querySelectorAll('.pr-body p').length >= who.entries.length,
+    'with paragraphs, not one run-on block');
+  t.ok(!/<\/p><p>[^<]*<\/div>/.test(printed) && printed.indexOf('<p></p>') < 0,
+    'and no stray empty paragraphs');
+
+  // Hostile text must not escape into the document.
+  who.entries[0].title = '<script>window.__pwn=1</script>';
+  t.ok(FT.chaptersPrintHtml(writer).indexOf('<script>') < 0, 'markup in a title is escaped');
+  who.entries[0].title = 'The shop reopens';
+
+  const noChapters = FT.peopleList().find((p) => !p.entries.length);
+  t.ok(FT.exportChaptersMarkdown(noChapters.id) === false,
+    'a person with no chapters exports nothing');
+  t.ok(FT.printChapters(noChapters.id) === false, 'and prints nothing');
+  t.ok(/no chapters/.test(d.getElementById('hintText').textContent), 'saying so');
 
   t.section('an empty tree exports nothing');
   const empty = await h.loadPage();

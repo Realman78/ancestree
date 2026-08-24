@@ -94,19 +94,19 @@ module.exports = async function (t, h) {
       }),
       'with the placeholder name selected, so typing replaces it');
 
-    await page.keyboard.type('Ana Kovač');
+    await page.keyboard.type('Ruth Miller');
     await page.waitForTimeout(400);
     t.ok(
-      await page.evaluate(() => FT.peopleList().some((p) => p.name === 'Ana Kovač')),
+      await page.evaluate(() => FT.peopleList().some((p) => p.name === 'Ruth Miller')),
       'typing renames the person as you go');
     t.ok(
-      (await page.locator('.card .initials').first().textContent()) === 'AK',
+      (await page.locator('.card .initials').first().textContent()) === 'RM',
       'and the initials follow along');
 
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
     t.ok((await page.locator('.card .name-edit').count()) === 0, 'Enter finishes the edit');
-    t.ok((await page.locator('.card .name').first().textContent()) === 'Ana Kovač',
+    t.ok((await page.locator('.card .name').first().textContent()) === 'Ruth Miller',
       'leaving the name in place');
 
     // Typing must not reach the canvas shortcuts.
@@ -307,7 +307,7 @@ module.exports = async function (t, h) {
     await page.evaluate(() => {
       FT.adoptDocument(FT.newTree('Remarriage'));
       const id = {};
-      ['Josip', 'Ana', 'Marta', 'Ivan', 'Petar'].forEach((n) => {
+      ['Joseph', 'Ruth', 'Marta', 'Ivan', 'Petar'].forEach((n) => {
         id[n] = FT.addPerson({ name: n, x: 0, y: 0 }).id;
       });
       const U = (p, c) => {
@@ -315,8 +315,8 @@ module.exports = async function (t, h) {
         FT.state.unions[u.id] = u;
         return u;
       };
-      window.__u1 = U(['Ana', 'Josip'], ['Ivan']).id;
-      U(['Josip', 'Marta'], ['Petar']);
+      window.__u1 = U(['Ruth', 'Joseph'], ['Ivan']).id;
+      U(['Joseph', 'Marta'], ['Petar']);
       FT.autoArrange();
       FT.render();
       FT.fitToScreen();
@@ -386,10 +386,10 @@ module.exports = async function (t, h) {
     const routed = await page.evaluate(() => {
       FT.adoptDocument(FT.newTree('Three marriages'));
       const id = {};
-      ['Josip', 'Ana', 'Marta', 'Vera'].forEach((n) => {
+      ['Joseph', 'Ruth', 'Marta', 'Carol'].forEach((n) => {
         id[n] = FT.addPerson({ name: n, x: 0, y: 0 }).id;
       });
-      [['Ana', 'Josip'], ['Josip', 'Marta'], ['Josip', 'Vera']].forEach((pair) => {
+      [['Ruth', 'Joseph'], ['Joseph', 'Marta'], ['Joseph', 'Carol']].forEach((pair) => {
         const u = FT.newUnion({ partners: pair.map((n) => id[n]) });
         FT.state.unions[u.id] = u;
       });
@@ -425,8 +425,8 @@ module.exports = async function (t, h) {
     t.section('a cross-generation partner draws differently');
     await page.evaluate(() => {
       const ids = Object.keys(FT.state.people);
-      const gp = ids.find((i) => FT.state.people[i].name.startsWith('Josip'));
-      const gc = ids.find((i) => FT.state.people[i].name.startsWith('Petra'));
+      const gp = ids.find((i) => FT.state.people[i].name.startsWith('Joseph'));
+      const gc = ids.find((i) => FT.state.people[i].name.startsWith('Emily'));
       FT.linkAsPartners(gp, gc);
       FT.autoArrange();
       FT.render();
@@ -439,7 +439,7 @@ module.exports = async function (t, h) {
     );
 
     t.section('a long tree name');
-    const LONG = 'The Extended Kovačević Family of Sinj and the Dalmatian Hinterland, 1840 onwards';
+    const LONG = 'The Extended Fairweather Family of Cedar Falls and the Iowa River Valley, 1840 onwards';
     await page.fill('#treeTitle', LONG);
     await page.click('#stage', { position: { x: 60, y: 300 } });
     await page.waitForTimeout(400);
@@ -456,7 +456,7 @@ module.exports = async function (t, h) {
     t.ok(title.scrollLeft === 0, 'the beginning is shown, not the end');
     t.ok(title.ellipsis === 'ellipsis', 'the tail is ellipsed');
     t.ok(title.tooltip === LONG, 'and hovering gives the whole name');
-    await page.fill('#treeTitle', 'The Kovač Family');
+    await page.fill('#treeTitle', 'The Miller Family');
     await page.waitForTimeout(300);
 
     t.section('the zoom readout');
@@ -544,11 +544,11 @@ module.exports = async function (t, h) {
     const cardFit = await page.evaluate(() => {
       FT.zoomTo(1);
       const ids = Object.keys(FT.state.people);
-      const a = ids.find((i) => FT.state.people[i].name.startsWith('Ana'));
+      const a = ids.find((i) => FT.state.people[i].name.startsWith('Ruth'));
       // The worst a card can be asked to hold: a name that wraps to two lines,
       // a long birth surname, and a full lifespan.
-      FT.state.people[a].name = 'Anastazija Marijana Kovačević';
-      FT.state.people[a].birthSurname = 'Kovačević-Buljan';
+      FT.state.people[a].name = 'Anastasia Marianne Fairweather';
+      FT.state.people[a].birthSurname = 'Fairweather-Calloway';
       FT.render();
       const card = document.querySelector('[data-id="' + a + '"]');
       const born = card.querySelector('.born');
@@ -607,16 +607,16 @@ module.exports = async function (t, h) {
         name: 'Marin Parin',
         x: 0, y: 0,
         birth: '1921-03-14', death: '1998-11-02',
-        birthplace: 'Sinj',
-        birthSurname: 'Kovačević-Buljan',
+        birthplace: 'Cedar Falls',
+        birthSurname: 'Fairweather-Calloway',
         // exactly what broke it: one word with no spaces at all
         knownFor: 'marinparin'.repeat(14),
       });
       const b = mk({
-        name: 'Bartholomew Maximilian Fitzwilliam-Kovačević the Third',
+        name: 'Bartholomew Maximilian Fitzwilliam-Fairweather the Third',
         x: 220, y: 0,
         birth: '1925-07-21',
-        birthplace: 'A Very Long Place Name In The Middle Of Absolutely Nowhere, Croatia',
+        birthplace: 'A Very Long Place Name In The Middle Of Absolutely Nowhere, Iowa',
         knownFor: 'Kept the village school open through two hard winters and then ' +
           'rebuilt the roof himself, twice, without ever once asking for help.',
       });
@@ -702,7 +702,7 @@ module.exports = async function (t, h) {
 
     t.section('born / died date pickers');
     const josip = await page.evaluate(() =>
-      Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Josip Kovač')
+      Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Joseph Miller')
     );
     await page.evaluate((id) => FT.openBook(id), josip);
     await page.waitForTimeout(500);
@@ -714,7 +714,7 @@ module.exports = async function (t, h) {
     t.ok((await page.evaluate((id) => FT.state.people[id].birth, josip)) === '1922-04-01', 'picking a date saves it');
     await page.click('#closeBook');
     await page.waitForTimeout(400);
-    const dates = await page.locator('.card').filter({ hasText: 'Josip' }).locator('.dates').textContent();
+    const dates = await page.locator('.card').filter({ hasText: 'Joseph' }).locator('.dates').textContent();
     t.ok(dates.trim() === '1922 – 1998', 'the card still shows years only (' + dates.trim() + ')');
 
     t.section('free-text escape hatch for approximate dates');
@@ -734,7 +734,7 @@ module.exports = async function (t, h) {
 
     await page.click('#closeBook');
     await page.waitForTimeout(400);
-    const approx = await page.locator('.card').filter({ hasText: 'Josip' }).locator('.dates').textContent();
+    const approx = await page.locator('.card').filter({ hasText: 'Joseph' }).locator('.dates').textContent();
     t.ok(approx.trim().startsWith('1880'), 'the card still finds the year in it (' + approx.trim() + ')');
 
     await page.evaluate((id) => FT.openBook(id), josip);
@@ -763,7 +763,7 @@ module.exports = async function (t, h) {
     const short = 'Village blacksmith';
     const long =
       'Village blacksmith for forty years, who reopened the forge after the war and made the ' +
-      'iron gate that still stands in the square at Sinj, with plane leaves along the top rail.';
+      'iron gate that still stands on the courthouse lawn, with oak leaves along the top rail.';
     await page.evaluate((v) => { FT.state.people[FT.selected || Object.keys(FT.state.people)[0]].knownFor = v; }, short);
     await page.evaluate((args) => { FT.state.people[args.id].knownFor = args.v; FT.openBook(args.id); }, { id: josip, v: short });
     await page.waitForTimeout(400);

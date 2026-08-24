@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Heirloom — Family Tree</title>
+<title>Ancestree — Family Tree</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -17,7 +17,7 @@
       <circle cx="19.5" cy="7" r="1.6" fill="currentColor"/>
       <circle cx="4.5" cy="7" r="1.6" fill="currentColor"/>
     </svg>
-    <span>Heirloom</span>
+    <span>Ancestree</span>
   </div>
 
   <div class="tree-id">
@@ -164,10 +164,10 @@
       <option value="partners">Partners</option>
       <option value="ended">Ended</option>
     </select>
-    <input id="unionFrom" class="union-date" placeholder="from"
-           aria-label="Year it began" size="6">
-    <input id="unionTo" class="union-date" placeholder="until"
-           aria-label="Year it ended" size="6">
+    <input id="unionFrom" class="union-date" placeholder="from" inputmode="numeric"
+           maxlength="4" aria-label="Year it began" size="6">
+    <input id="unionTo" class="union-date" placeholder="until" inputmode="numeric"
+           maxlength="4" aria-label="Year it ended" size="6">
     <span class="pill-sep"></span>
   </span>
   <button data-action="removeEdge" class="danger" title="Remove this link (Del)">Remove link</button>
@@ -204,6 +204,9 @@
     </div>
   </div>
 </div>
+
+<!-- Filled only while printing a life's chapters, then emptied again. -->
+<div id="printRoot" class="print-root" aria-hidden="true"></div>
 
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 

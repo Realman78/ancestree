@@ -1,4 +1,4 @@
-# Heirloom — family tree prototype
+# Ancestree
 
 A family tree you can lay out by hand, where every person carries a diary of
 their life.
@@ -19,7 +19,7 @@ The server is optional and stores nothing — it just serves the folder over
 is a static site: any host will do.
 
 **Your first visit is an empty board.** "Load sample family" in the bottom bar
-fills it with the Kovačs if you want something to poke at first; it asks before
+fills it with the Millers if you want something to poke at first; it asks before
 replacing a board that already has people on it.
 
 ## What it does
@@ -65,7 +65,7 @@ goes around rather than hiding behind.
 
 Set what a relationship was — **married**, **partners**, or **ended**, and the
 years it ran — either in the person's book under **Relationships**, or by
-selecting the line itself. The line is captioned (`m. 1948 – 1961`), an
+selecting the line itself. The year boxes take digits only. The line is captioned (`m. 1948 – 1961`), an
 unmarried partnership is dashed, and one that ended carries the genealogical
 double-slash. Relationships order chronologically, so remarriages read left to
 right. Nothing is drawn when no dates are recorded, so trees that do not track
@@ -116,6 +116,13 @@ pulled out of either form.
 
 "Known for" is two lines; anything longer is cut with an ellipsis and shown in
 full when you hover it — click to edit.
+
+**Exporting one life.** At the foot of the Chapters list in someone's book,
+**Markdown** downloads their chapters as a document — the person, their dates,
+and every chapter in order. **PDF** opens a print view; your browser's *Save as
+PDF* turns it into a file. There is no bundled PDF library: the browser's own
+print engine typesets better than anything this project could carry, and it
+keeps the app dependency-free.
 
 A chapter has a start date and, if you want one, an **end date** — press
 "+ end date" for anything that covers a stretch rather than a day. The contents

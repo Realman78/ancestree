@@ -10,11 +10,11 @@ module.exports = function (t, h) {
   people.forEach((p) => (by[p.name.split(' ')[0]] = p));
 
   t.ok(people.every((p) => p.x % FT.GRID === 0 && p.y % FT.GRID === 0), 'all cards land on the grid');
-  t.ok(by.Josip.y === by.Ana.y, 'partners share a row');
-  t.ok(by.Marko.y === by.Josip.y + FT.ROW_H, 'children sit one row below their parents');
-  t.ok(by.Petra.y === by.Marko.y + FT.ROW_H, 'grandchildren two rows below');
-  t.ok(by.Vera.y === by.Marko.y, 'a married-in partner shares the spouse row');
-  t.ok(by.Nina.y === by.Petra.y, 'cousins share a row');
+  t.ok(by.Joseph.y === by.Ruth.y, 'partners share a row');
+  t.ok(by.Robert.y === by.Joseph.y + FT.ROW_H, 'children sit one row below their parents');
+  t.ok(by.Emily.y === by.Robert.y + FT.ROW_H, 'grandchildren two rows below');
+  t.ok(by.Carol.y === by.Robert.y, 'a married-in partner shares the spouse row');
+  t.ok(by.Grace.y === by.Emily.y, 'cousins share a row');
 
   const overlaps = (list) => {
     let n = 0;
@@ -26,7 +26,7 @@ module.exports = function (t, h) {
   t.ok(overlaps(people) === 0, 'no two cards overlap after tidy-up');
 
   const u = FT.unionList().find(
-    (x) => x.children.length === 2 && x.partners.includes(by.Marko.id)
+    (x) => x.children.length === 2 && x.partners.includes(by.Robert.id)
   );
   const kids = u.children.map((c) => FT.state.people[c]);
   const coupleMid = (FT.state.people[u.partners[0]].x + FT.state.people[u.partners[1]].x) / 2 + FT.CARD_W / 2;
@@ -34,17 +34,17 @@ module.exports = function (t, h) {
   t.ok(Math.abs(coupleMid - kidMid) <= FT.GRID, 'a couple is centred over their children');
 
   t.section('relationships');
-  const kid = FT.addChild(by.Petra.id);
-  t.ok(kid && FT.parentsOf(kid.id).includes(by.Petra.id), 'addChild links parent to child');
-  const mate = FT.addPartner(by.Petra.id);
-  t.ok(mate && FT.partnersOf(by.Petra.id).includes(mate.id), 'addPartner joins the existing union');
+  const kid = FT.addChild(by.Emily.id);
+  t.ok(kid && FT.parentsOf(kid.id).includes(by.Emily.id), 'addChild links parent to child');
+  const mate = FT.addPartner(by.Emily.id);
+  t.ok(mate && FT.partnersOf(by.Emily.id).includes(mate.id), 'addPartner joins the existing union');
   t.ok(FT.parentsOf(kid.id).length === 2, "the new partner becomes the child's second parent");
-  t.ok(FT.addParent(by.Josip.id) !== null, 'addParent creates a generation above');
-  t.ok(FT.addParent(by.Marko.id) === null, 'refuses a third parent');
+  t.ok(FT.addParent(by.Joseph.id) !== null, 'addParent creates a generation above');
+  t.ok(FT.addParent(by.Robert.id) === null, 'refuses a third parent');
 
   t.section('integrity');
-  t.ok(FT.linkAsChild(by.Petra.id, by.Josip.id) === false, 'refuses a link that would loop the tree');
-  t.ok(FT.linkAsPartners(by.Josip.id, by.Josip.id) === false, 'refuses self-partnering');
+  t.ok(FT.linkAsChild(by.Emily.id, by.Joseph.id) === false, 'refuses a link that would loop the tree');
+  t.ok(FT.linkAsPartners(by.Joseph.id, by.Joseph.id) === false, 'refuses self-partnering');
   FT.removePerson(kid.id);
   t.ok(!FT.state.people[kid.id], 'removePerson deletes the person');
   t.ok(
@@ -62,12 +62,12 @@ module.exports = function (t, h) {
   cross.state = cross.demoTree();
   const c = {};
   cross.peopleList().forEach((p) => (c[p.name.split(' ')[0]] = p));
-  t.ok(cross.linkAsPartners(c.Josip.id, c.Petra.id), 'a grandparent can be partnered with a grandchild');
+  t.ok(cross.linkAsPartners(c.Joseph.id, c.Emily.id), 'a grandparent can be partnered with a grandchild');
   t.ok(
-    !cross.parentsOf(c.Marko.id).includes(c.Petra.id),
+    !cross.parentsOf(c.Robert.id).includes(c.Emily.id),
     'and that does not retroactively make her a parent of her own father'
   );
-  t.ok(cross.ancestrallyRelated(c.Josip.id, c.Petra.id), 'the pair is recognised as ancestrally related');
+  t.ok(cross.ancestrallyRelated(c.Joseph.id, c.Emily.id), 'the pair is recognised as ancestrally related');
 
   const started = Date.now();
   cross.autoArrange();
@@ -75,14 +75,14 @@ module.exports = function (t, h) {
   const rows = cross.peopleList().map((p) => p.y / cross.ROW_H);
   t.ok(took < 2000, 'the layout still settles quickly (' + took + 'ms)');
   t.ok(Math.max(...rows) === 2, 'and keeps its three generations (max row ' + Math.max(...rows) + ')');
-  t.ok(cross.state.people[c.Josip.id].y === 0, 'the grandparent stays on the top row');
+  t.ok(cross.state.people[c.Joseph.id].y === 0, 'the grandparent stays on the top row');
   t.ok(
-    cross.state.people[c.Petra.id].y === 2 * cross.ROW_H,
+    cross.state.people[c.Emily.id].y === 2 * cross.ROW_H,
     'the grandchild stays two rows below, not dragged up to meet them'
   );
   t.ok(overlaps(cross.peopleList()) === 0, 'nothing overlaps');
   t.ok(
-    cross.isCrossGenerationUnion(cross.unionsOf(c.Josip.id).find((u) => u.partners.includes(c.Petra.id))),
+    cross.isCrossGenerationUnion(cross.unionsOf(c.Joseph.id).find((u) => u.partners.includes(c.Emily.id))),
     'the link is flagged so it can be drawn as a cross-generation one'
   );
 
@@ -94,15 +94,15 @@ module.exports = function (t, h) {
   loop.state = loop.demoTree();
   const l = {};
   loop.peopleList().forEach((p) => (l[p.name.split(' ')[0]] = p));
-  const grandUnion = loop.unionsOf(l.Josip.id)[0];
-  loop.dissolveUnion(grandUnion.id); // leaves Josip a lone parent with a free seat
+  const grandUnion = loop.unionsOf(l.Joseph.id)[0];
+  loop.dissolveUnion(grandUnion.id); // leaves Joseph a lone parent with a free seat
   t.ok(grandUnion.partners.length === 1, 'a union with one partner and children has a free seat');
-  loop.linkAsPartners(l.Josip.id, l.Petra.id);
+  loop.linkAsPartners(l.Joseph.id, l.Emily.id);
   t.ok(
-    !grandUnion.children.includes(l.Marko.id) || grandUnion.partners.indexOf(l.Petra.id) < 0,
+    !grandUnion.children.includes(l.Robert.id) || grandUnion.partners.indexOf(l.Emily.id) < 0,
     'the descendant is not seated into the union that produced her own father'
   );
-  t.ok(loop.partnersOf(l.Josip.id).includes(l.Petra.id), 'but the partnership is still recorded');
+  t.ok(loop.partnersOf(l.Joseph.id).includes(l.Emily.id), 'but the partnership is still recorded');
   loop.autoArrange();
   t.ok(
     Math.max(...loop.peopleList().map((p) => p.y / loop.ROW_H)) <= 3,
@@ -114,21 +114,21 @@ module.exports = function (t, h) {
   doc.state = doc.demoTree();
   const d = {};
   doc.peopleList().forEach((p) => (d[p.name.split(' ')[0]] = p));
-  const married = doc.unionsOf(d.Josip.id)[0];
+  const married = doc.unionsOf(d.Joseph.id)[0];
   const hadChildren = married.children.slice();
   doc.dissolveUnion(married.id);
   t.ok(doc.state.unions[married.id].partners.length === 1, 'dissolving a couple with children keeps one parent');
   t.ok(hadChildren.every((k) => doc.parentsOf(k).length === 1), 'the children keep that parent');
 
-  const childless = doc.newUnion({ partners: [d.Vera.id, d.Luka.id], children: [] });
+  const childless = doc.newUnion({ partners: [d.Carol.id, d.Frank.id], children: [] });
   doc.state.unions[childless.id] = childless;
   doc.dissolveUnion(childless.id);
   t.ok(!doc.state.unions[childless.id], 'a childless couple simply goes away');
 
-  const u2 = doc.unionsOf(d.Marko.id)[0];
-  doc.detachChild(u2.id, d.Petra.id);
-  t.ok(!doc.parentUnionOf(d.Petra.id), 'a detached child has no parents');
-  t.ok(!!doc.state.people[d.Petra.id], 'but is still in the tree');
+  const u2 = doc.unionsOf(d.Robert.id)[0];
+  doc.detachChild(u2.id, d.Emily.id);
+  t.ok(!doc.parentUnionOf(d.Emily.id), 'a detached child has no parents');
+  t.ok(!!doc.state.people[d.Emily.id], 'but is still in the tree');
 
   t.section('multiple partners stay contiguous');
   // Laying out one union at a time let an unrelated card sit between a couple,
@@ -164,24 +164,24 @@ module.exports = function (t, h) {
   };
 
   let id = build([
-    { p: ['Ana', 'Josip'], c: ['Ivan', 'Maja'], d: '1948' },
-    { p: ['Josip', 'Marta'], c: ['Petar'], d: '1962' },
+    { p: ['Ruth', 'Joseph'], c: ['Ivan', 'Maja'], d: '1948' },
+    { p: ['Joseph', 'Marta'], c: ['Petar'], d: '1962' },
   ]);
-  t.ok(adjacent(id.Ana, id.Josip) && adjacent(id.Josip, id.Marta),
+  t.ok(adjacent(id.Ruth, id.Joseph) && adjacent(id.Joseph, id.Marta),
     'a remarriage seats both spouses beside the person (' + rowOrder(0).join(' ') + ')');
   t.ok(!anyOverlap(), 'with nothing overlapping');
-  t.ok(mp.parentsOf(id.Ivan).includes(id.Josip) && !mp.parentsOf(id.Petar).includes(id.Ana),
+  t.ok(mp.parentsOf(id.Ivan).includes(id.Joseph) && !mp.parentsOf(id.Petar).includes(id.Ruth),
     'and each set of children keeps its own parents');
 
   // The case that was actively wrong: both spouses remarry.
   id = build([
-    { p: ['Josip', 'Ana'], c: ['Ivan'], d: '1948' },
-    { p: ['Josip', 'Marta'], c: ['Petar'], d: '1962' },
-    { p: ['Ana', 'Boris'], c: ['Nina'], d: '1965' },
+    { p: ['Joseph', 'Ruth'], c: ['Ivan'], d: '1948' },
+    { p: ['Joseph', 'Marta'], c: ['Petar'], d: '1962' },
+    { p: ['Ruth', 'Boris'], c: ['Grace'], d: '1965' },
   ]);
-  t.ok(adjacent(id.Josip, id.Ana), 'Josip and Ana sit together');
-  t.ok(adjacent(id.Josip, id.Marta), 'Josip and Marta sit together');
-  t.ok(adjacent(id.Ana, id.Boris), 'Ana and Boris sit together');
+  t.ok(adjacent(id.Joseph, id.Ruth), 'Joseph and Ruth sit together');
+  t.ok(adjacent(id.Joseph, id.Marta), 'Joseph and Marta sit together');
+  t.ok(adjacent(id.Ruth, id.Boris), 'Ruth and Boris sit together');
   t.ok(!anyOverlap(), 'and nothing overlaps (' + rowOrder(0).join(' ') + ')');
   // Nobody should be parked between a couple, which is what read as a marriage.
   const row = rowOrder(0);
@@ -190,14 +190,14 @@ module.exports = function (t, h) {
     const j = row.indexOf(b);
     return Math.abs(i - j) - 1;
   };
-  t.ok(between('Josip', 'Ana') === 0, 'no stranger sits between Josip and Ana');
-  t.ok(between('Ana', 'Boris') === 0, 'nor between Ana and Boris');
+  t.ok(between('Joseph', 'Ruth') === 0, 'no stranger sits between Joseph and Ruth');
+  t.ok(between('Ruth', 'Boris') === 0, 'nor between Ruth and Boris');
 
   // A star cannot seat every spouse adjacent — but it must still be sane.
   id = build([
-    { p: ['Ana', 'Josip'], c: ['Ivan'], d: '1948' },
-    { p: ['Josip', 'Marta'], c: ['Petar'], d: '1957' },
-    { p: ['Josip', 'Vera'], c: ['Nina'], d: '1970' },
+    { p: ['Ruth', 'Joseph'], c: ['Ivan'], d: '1948' },
+    { p: ['Joseph', 'Marta'], c: ['Petar'], d: '1957' },
+    { p: ['Joseph', 'Carol'], c: ['Grace'], d: '1970' },
   ]);
   t.ok(!anyOverlap(), 'three marriages lay out without overlap (' + rowOrder(0).join(' ') + ')');
   const reaching = mp.unionList().filter((u) => u.partners.length === 2 &&
@@ -219,6 +219,20 @@ module.exports = function (t, h) {
     { id: 'b', date: '1962' }, { id: 'a', date: '1948' }, { id: 'c', date: '' },
   ]);
   t.ok(sorted.map((u) => u.id).join('') === 'abc', 'unions order chronologically, undated last');
+
+  t.section('relationship years are years');
+  t.ok(mp.cleanYear('1948') === '1948', 'a year passes through');
+  t.ok(mp.cleanYear('19x4y8') === '1948', 'letters are stripped as you type');
+  t.ok(mp.cleanYear('abc') === '', 'text with no digits yields nothing');
+  t.ok(mp.cleanYear('194812') === '1948', 'and it cannot run past four digits');
+  t.ok(mp.cleanYear('1948-09-19') === '1948', 'an ISO date from an older file becomes its year');
+  t.ok(mp.cleanYear(null) === '' && mp.cleanYear(undefined) === '', 'nothing in, nothing out');
+  const coerced = mp.normalize({
+    people: { a: { name: 'A' }, b: { name: 'B' } },
+    unions: { u1: { partners: ['a', 'b'], date: '1948-09-19', endDate: 'sometime 1961' } },
+  });
+  t.ok(coerced.unions.u1.date === '1948', 'stored union dates are coerced on load');
+  t.ok(coerced.unions.u1.endDate === '1961', 'end dates too');
 
   t.section('born surname');
   t.ok(mp.newPerson().birthSurname === '', 'people start with none');
@@ -269,11 +283,11 @@ module.exports = function (t, h) {
   t.ok(ranged.people.a.entries[2].end === '', 'defaults a missing end date to empty');
 
   t.section('undo');
-  const before = FT.state.people[by.Ana.id].name;
+  const before = FT.state.people[by.Ruth.id].name;
   FT.checkpoint();
-  FT.state.people[by.Ana.id].name = 'CHANGED';
+  FT.state.people[by.Ruth.id].name = 'CHANGED';
   FT.undo();
-  t.ok(FT.state.people[by.Ana.id].name === before, 'undo restores the previous snapshot');
+  t.ok(FT.state.people[by.Ruth.id].name === before, 'undo restores the previous snapshot');
   FT.redo();
-  t.ok(FT.state.people[by.Ana.id].name === 'CHANGED', 'redo reapplies it');
+  t.ok(FT.state.people[by.Ruth.id].name === 'CHANGED', 'redo reapplies it');
 };

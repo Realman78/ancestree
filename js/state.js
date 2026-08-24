@@ -1,4 +1,4 @@
-/* Heirloom — shared state, persistence, undo.
+/* Ancestree — shared state, persistence, undo.
    Everything hangs off window.FT so the app runs from file:// with no build step. */
 (function () {
   const FT = (window.FT = window.FT || {});
@@ -50,6 +50,22 @@
     if (iso) return iso[1];
     const loose = /(\d{4})/.exec(s);
     return loose ? loose[1] : s;
+  };
+
+  /* Relationship years are typed into small boxes, so keep them to digits and
+     a plausible range rather than accepting anything at all. Returns '' for
+     nothing usable, so a half-typed "19" simply reads as no date yet. */
+  FT.MIN_YEAR = 1;
+  FT.MAX_YEAR = 2999;
+
+  FT.cleanYear = function (v) {
+    const digits = String(v == null ? '' : v).replace(/[^0-9]/g, '').slice(0, 4);
+    return digits;
+  };
+
+  FT.isUsableYear = function (v) {
+    const n = Number(v);
+    return /^[0-9]{3,4}$/.test(String(v)) && n >= FT.MIN_YEAR && n <= FT.MAX_YEAR;
   };
 
   /* "14 March 1921". Free text is passed through untouched. */
@@ -318,8 +334,10 @@
         return t.people[pid];
       });
       if (!partners.length && !children.length) return;
-      let endDate = String(u.endDate || '');
-      const date = String(u.date || '');
+      // The fields are year-only, so an ISO date from an older file becomes its
+      // year. Nothing is lost on screen: only the year was ever displayed.
+      let endDate = FT.cleanYear(u.endDate);
+      const date = FT.cleanYear(u.date);
       // An end before the beginning is meaningless; drop it rather than store it.
       if (endDate && date && endDate < date) endDate = '';
       t.unions[id] = FT.newUnion({
@@ -600,7 +618,7 @@
   // --- demo document ------------------------------------------------------
 
   FT.demoTree = function () {
-    const t = FT.newTree('The Kovač Family');
+    const t = FT.newTree('The Miller Family');
     const mk = function (name, gender, birth, death, extra) {
       const p = FT.newPerson(
         Object.assign({ name: name, gender: gender, birth: birth, death: death }, extra || {})
@@ -626,80 +644,95 @@
       return u;
     };
 
-    const josip = mk('Josip Kovač', 'm', '1921-03-14', '1998-11-02', {
-      birthplace: 'Sinj, Croatia',
-      knownFor: 'Village blacksmith for forty years',
+    const joseph = mk('Joseph Miller', 'm', '1921-03-14', '1998-11-02', {
+      birthplace: 'Cedar Falls, Iowa',
+      knownFor: 'Ran the machine shop on Water Street for forty years',
     });
-    josip.entries = [
+    joseph.entries = [
       {
         id: FT.uid('e'),
         date: '1946-06-02',
-        title: 'The forge reopens',
+        end: '',
+        title: 'The shop reopens',
         body:
-          'The war took four years and the roof of the workshop. Today I lit the fire again.\n\n' +
-          'Ana brought bread at noon and stayed until the light went. She said the sound of the ' +
-          'hammer made the village feel alive again. I told her I would make her anything she asked ' +
-          'for. She asked for a gate.',
+          'The war took four years and the roof of the shop with it. Today I lit the ' +
+          'forge again.\n\n' +
+          'Ruth brought sandwiches at noon and stayed until the light went. She said the ' +
+          'sound of the hammer made the street feel alive again. I told her I would make ' +
+          'her anything she asked for. She asked for a gate.',
       },
       {
         id: FT.uid('e'),
         date: '1948-04-11',
+        end: '',
         title: 'A gate, and a promise',
         body:
-          'Finished the gate. Iron leaves along the top rail, because she likes the plane tree in ' +
-          'the square. Her father saw it and shook my hand for a long time without saying anything.\n\n' +
+          'Finished the gate. Iron oak leaves along the top rail, because she likes the ' +
+          'big oak on the courthouse lawn. Her father looked at it a long while and shook ' +
+          'my hand without saying anything.\n\n' +
           'We are to be married in September.',
       },
     ];
 
-    const ana = mk('Ana Kovač', 'f', '1925-07-21', '2004-02-16', {
-      birthplace: 'Trilj, Croatia',
-      birthSurname: 'Buljan',
-      knownFor: 'Kept the village school open through two hard winters',
+    const ruth = mk('Ruth Miller', 'f', '1925-07-21', '2004-02-16', {
+      birthplace: 'Waterloo, Iowa',
+      birthSurname: 'Calloway',
+      knownFor: 'Kept the county school open through two hard winters',
     });
-    ana.entries = [
+    ruth.entries = [
       {
         id: FT.uid('e'),
         date: '1953-09-19',
-        title: 'Marko',
+        end: '',
+        title: 'Robert',
         body:
-          'Our son arrived before dawn, furious about it. Josip has not put down the hammer all week ' +
-          'but he put it down today.',
+          'Our son arrived before dawn, furious about it. Joseph has not put the hammer ' +
+          'down all week, but he put it down today.',
       },
     ];
 
-    const marko = mk('Marko Kovač', 'm', '1953-09-19', '', {
-      birthplace: 'Sinj, Croatia',
-      knownFor: 'First in the family to go to university',
+    const robert = mk('Robert Miller', 'm', '1953-09-19', '', {
+      birthplace: 'Cedar Falls, Iowa',
+      knownFor: 'First in the family to finish college',
     });
-    marko.entries = [
+    robert.entries = [
       {
         id: FT.uid('e'),
         date: '1971-10-04',
-        title: 'Zagreb',
+        end: '',
+        title: 'Ames',
         body:
-          'A room with one window and three other boys in it. Mother packed more food than I can eat ' +
-          'in a month. Father said nothing at the station, then gripped my shoulder hard enough to ' +
-          'bruise.\n\nI will not waste this.',
+          'A room with one window and three other boys in it. Mother packed more food ' +
+          'than I can eat in a month. Dad said nothing at the bus station, then gripped ' +
+          'my shoulder hard enough to bruise.\n\nI will not waste this.',
       },
     ];
 
-    const vera = mk('Vera Kovač', 'f', '1956-05-08', '', {
-      birthplace: 'Split, Croatia',
-      birthSurname: 'Perić',
+    const carol = mk('Carol Miller', 'f', '1956-05-08', '', {
+      birthplace: 'Des Moines, Iowa',
+      birthSurname: 'Brennan',
     });
-    const ivana = mk('Ivana Kovač', 'f', '1958-01-30', '', {
-      birthplace: 'Sinj, Croatia',
-      knownFor: 'Sailed the Adriatic single-handed at nineteen',
+    const nancy = mk('Nancy Weaver', 'f', '1958-01-30', '', {
+      birthplace: 'Cedar Falls, Iowa',
+      birthSurname: 'Miller',
+      knownFor: 'Rode a motorcycle to Alaska and back at nineteen',
     });
-    const luka = mk('Luka Marić', 'm', '1955-10-12', '', {});
-    const petra = mk('Petra Kovač', 'f', '1982-04-03', '', { birthplace: 'Zagreb, Croatia' });
-    const tomo = mk('Tomislav Kovač', 'm', '1985-08-27', '', { birthplace: 'Zagreb, Croatia' });
-    const nina = mk('Nina Marić', 'f', '1984-06-15', '', {});
+    const frank = mk('Frank Weaver', 'm', '1955-10-12', '', {
+      birthplace: 'Dubuque, Iowa',
+    });
+    const emily = mk('Emily Miller', 'f', '1982-04-03', '', {
+      birthplace: 'Chicago, Illinois',
+    });
+    const thomas = mk('Thomas Miller', 'm', '1985-08-27', '', {
+      birthplace: 'Chicago, Illinois',
+    });
+    const grace = mk('Grace Weaver', 'f', '1984-06-15', '', {
+      birthplace: 'Madison, Wisconsin',
+    });
 
-    union([josip, ana], [marko, ivana], { date: '1948-09-19' });
-    union([marko, vera], [petra, tomo], { date: '1980-06-14' });
-    union([ivana, luka], [nina], { date: '1982-04-02', status: 'partners' });
+    union([joseph, ruth], [robert, nancy], { date: '1948' });
+    union([robert, carol], [emily, thomas], { date: '1980' });
+    union([nancy, frank], [grace], { date: '1982', status: 'partners' });
     return t;
   };
 })();

@@ -1,4 +1,4 @@
-/* Heirloom — wiring: toolbar, keyboard, document lifecycle. */
+/* Ancestree — wiring: toolbar, keyboard, document lifecycle. */
 (function () {
   const FT = window.FT;
 
@@ -109,16 +109,22 @@
       u.status = unionStatus.value;
     }, 'union-status');
   });
-  unionFrom.addEventListener('input', function () {
-    editUnion(function (u) {
-      u.date = unionFrom.value.trim();
-    }, 'union-from');
-  });
-  unionTo.addEventListener('input', function () {
-    editUnion(function (u) {
-      u.endDate = unionTo.value.trim();
-    }, 'union-to');
-  });
+  /* Years only — strip anything else as it is typed. */
+  function yearInput(el, apply, tag) {
+    el.addEventListener('input', function () {
+      const cleaned = FT.cleanYear(el.value);
+      if (el.value !== cleaned) el.value = cleaned;
+      editUnion(function (u) {
+        apply(u, cleaned);
+      }, tag);
+    });
+  }
+  yearInput(unionFrom, function (u, v) {
+    u.date = v;
+  }, 'union-from');
+  yearInput(unionTo, function (u, v) {
+    u.endDate = v;
+  }, 'union-to');
 
   const zoomLevel = document.getElementById('zoomLevel');
   const zoomMenu = document.getElementById('zoomMenu');

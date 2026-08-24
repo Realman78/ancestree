@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* Heirloom — optional local static server.
+/* Ancestree — optional local static server.
 
    The app runs fine straight from index.html. This only serves the folder over
    http, which gives localStorage and downloads a normal origin to work with.
@@ -48,5 +48,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log('\n  Heirloom running at  http://localhost:' + PORT + '\n');
+  console.log('\n  Ancestree running at  http://localhost:' + PORT + '\n');
 });

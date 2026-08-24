@@ -11,7 +11,7 @@ module.exports = async function (t, h) {
   t.ok($$('.card').length === 0, 'no cards on the board');
   t.ok(Object.keys(FT.state.people).length === 0, 'and no people in the document');
   t.ok(/Empty board/.test($('#hintText').textContent), 'the board says what to do next');
-  t.ok(!/Kovač/.test(JSON.stringify(FT.state)), "a stranger's family is not loaded over the top");
+  t.ok(!/Miller/.test(JSON.stringify(FT.state)), "a stranger's family is not loaded over the top");
 
   t.section('the sample is a click away');
   $('[data-action="demo"]').click();
@@ -32,7 +32,7 @@ module.exports = async function (t, h) {
 
   t.section('new trees never overwrite');
   const firstId = FT.state.id;
-  FT.state.title = 'Kovač line';
+  FT.state.title = 'Miller line';
   FT.save();
   $('[data-action="newTree"]').click();
   await h.wait(150);
@@ -87,7 +87,7 @@ module.exports = async function (t, h) {
         JSON.stringify({
           id: 't_legacy',
           title: 'Grandmother’s tree',
-          people: { p1: { name: 'Vera', x: 0, y: 0 } },
+          people: { p1: { name: 'Carol', x: 0, y: 0 } },
           unions: {},
         })
       );
