@@ -245,6 +245,14 @@ body {
 }
 .btn.icon svg { display: block; }
 .btn.small { font-size: 12px; padding: 5px 10px; }
+.zoom-level {
+  min-width: 52px;
+  height: 32px;
+  padding: 7px 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
 .btn.with-icon { display: inline-flex; align-items: center; gap: 6px; height: 32px; }
 .btn.with-icon svg { display: block; }
 .btn:disabled {
@@ -387,6 +395,14 @@ body {
 .card[data-gender="f"] .avatar { background: linear-gradient(150deg, #b5849e, #8d5c78); }
 .card[data-gender="m"] .avatar { background: linear-gradient(150deg, #7590ad, #4f6c8a); }
 
+/* Initials are uppercase, so they carry no descender — but the line box still
+   reserves descender space, which parks the visible letters about a pixel low
+   in the circle. Nudge by a font-relative amount so every size is centred. */
+.initials {
+  display: block;
+  transform: translateY(-0.067em);
+}
+
 .avatar.has-photo { background: #e6dcc8; overflow: hidden; }
 .avatar.has-photo img {
   width: 100%;
@@ -434,19 +450,6 @@ body {
 .card:hover .book-btn, .card.selected .book-btn { opacity: 1; }
 .book-btn:hover { color: var(--walnut); background: #fff; border-color: var(--line); }
 
-.entry-count {
-  position: absolute;
-  right: 9px; top: 8px;
-  min-width: 17px; height: 17px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: var(--gold);
-  color: #fffdf5;
-  font-size: 10.5px;
-  font-weight: 600;
-  display: grid;
-  place-items: center;
-}
 
 /* ------------------------------------------------------------------ pill */
 
@@ -984,14 +987,6 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
 .entry-body::placeholder { color: #cfc4b0; font-style: italic; }
 .entry-body-ro { white-space: normal; min-height: 220px; }
 
-.entry-foot {
-  margin-top: 18px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line-soft);
-  font-size: 11.5px;
-  color: var(--ink-faint);
-  text-align: right;
-}
 
 .page-empty {
   height: 100%;
@@ -1126,22 +1121,6 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
-
-/* ------------------------------------------------- the file link panel */
-
-.file-panel {
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px solid var(--line-soft);
-}
-.file-status {
-  margin: 0;
-  padding: 2px 8px 8px;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--ink-soft);
-}
-.file-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 8px; }
 
 .storage-foot { align-items: center; justify-content: space-between; flex-wrap: nowrap; }
 .storage-foot .mini-btn { white-space: nowrap; }

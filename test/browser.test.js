@@ -4,7 +4,7 @@ module.exports = async function (t, h) {
   const { chromium } = require('playwright');
 
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 }, acceptDownloads: true });
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
@@ -221,6 +221,63 @@ module.exports = async function (t, h) {
       await page.evaluate(() => FT.peopleList().every((p) => p.y / FT.ROW_H <= 3)),
       'and the tree keeps its generations instead of running off the canvas'
     );
+
+    t.section('the zoom readout');
+    await page.click('[data-action="fit"]');
+    await page.waitForTimeout(400);
+    const shown = () => page.locator('#zoomLevel').textContent();
+    t.ok(/^\d+%$/.test(await shown()), 'the toolbar states the zoom as a percentage');
+    const atFit = await shown();
+    await page.click('[data-action="zoomIn"]');
+    await page.waitForTimeout(350);
+    t.ok((await shown()) !== atFit, 'it changes when you zoom in');
+    t.ok(
+      parseInt(await shown(), 10) > parseInt(atFit, 10),
+      'and the number goes up (' + atFit + ' → ' + (await shown()) + ')'
+    );
+    await page.click('[data-action="zoomOut"]');
+    await page.waitForTimeout(350);
+    t.ok((await shown()) === atFit, 'zooming back out returns to the same figure');
+
+    await page.click('#zoomLevel');
+    await page.waitForTimeout(350);
+    t.ok((await shown()) === '100%', 'clicking it resets to 100%');
+    t.ok(
+      Math.abs((await page.evaluate(() => FT.zoomLevel())) - 1) < 0.001,
+      'and the canvas really is at 1:1'
+    );
+
+    // Ctrl+scroll must keep the readout honest too.
+    await page.mouse.move(700, 500);
+    await page.keyboard.down('Control');
+    await page.mouse.wheel(0, -200);
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(350);
+    t.ok((await shown()) !== '100%', 'and it follows Ctrl+scroll zooming');
+
+    t.section('the card and chapter page are uncluttered');
+    t.ok((await page.locator('.card .entry-count').count()) === 0, 'cards show no chapter badge');
+    await page.evaluate(() => {
+      const id = Object.keys(FT.state.people).find((i) => FT.state.people[i].entries.length);
+      FT.openBook(id);
+    });
+    await page.waitForTimeout(500);
+    t.ok((await page.locator('#wordCount').count()) === 0, 'the chapter page shows no word count');
+    await page.click('#closeBook');
+    await page.waitForTimeout(400);
+
+    t.section('the detailed SVG downloads');
+    await page.click('#exportBtn');
+    await page.waitForTimeout(200);
+    t.ok(await page.locator('[data-action="exportDetailedSvg"]').isVisible(),
+      'the export menu offers it');
+    const [dl] = await Promise.all([
+      page.waitForEvent('download', { timeout: 15000 }),
+      page.click('#exportMenu [data-action="exportDetailedSvg"]'),
+    ]);
+    t.ok(/-detailed\.svg$/.test(dl.suggestedFilename()),
+      'named as a detailed export (' + dl.suggestedFilename() + ')');
+    t.ok(!(await page.locator('#exportMenu').isVisible()), 'and the menu closes behind it');
 
     t.section('born / died date pickers');
     const josip = await page.evaluate(() =>

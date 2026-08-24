@@ -52,6 +52,16 @@
     return loose ? loose[1] : s;
   };
 
+  /* "14 March 1921". Free text is passed through untouched. */
+  FT.prettyDate = function (iso) {
+    if (!iso) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso));
+    if (!m) return String(iso);
+    const months = ['January','February','March','April','May','June','July',
+                    'August','September','October','November','December'];
+    return Number(m[3]) + ' ' + months[Number(m[2]) - 1] + ' ' + m[1];
+  };
+
   FT.lifespan = function (p) {
     const b = FT.yearOf(p.birth);
     const d = FT.yearOf(p.death);

@@ -63,7 +63,6 @@ stay small in the browser. People without a photo keep their initials.
 **A book for each life.** Click the book icon on a card, or double-click it.
 The left page is who they were and a table of contents; the right page is the
 open chapter, on ruled paper, which you just type into. It saves as you write.
-The badge on a card counts the chapters in their book.
 
 **Gender** is a field on each person (Woman / Man / Unspecified) that sets the
 card's tint and matches the legend in the bottom bar.
@@ -90,26 +89,6 @@ tree** opens an empty board — it never touches the one you were on — and eac
 tree is stored separately. Deleting one asks first, and that is the single
 action here that undo cannot reach.
 
-**Keeping a tree in a real file.** Open the shelf and use **Save to a file…**:
-from then on the tree writes itself to that file as you work, and the panel
-shows when it last saved. **Open a file…** goes the other way.
-
-This is also how you sync without an account. Put the file in a folder that
-already syncs — Dropbox, iCloud Drive, OneDrive, Syncthing — and the tree
-follows you between computers, with no service in the middle and nobody holding
-a copy of your diaries.
-
-Once a tree is linked, **the file is the tree** — the browser's copy is just a
-cache of it. Whenever the app regains access to the file it takes whichever
-version is newer, so opening the app on your desktop picks up what you did on
-your laptop instead of pushing a week-old cache over it.
-
-Browsers re-ask for permission to write to a file after a restart, so the panel
-offers **Reconnect** instead of a prompt out of nowhere. This needs the File
-System Access API (Chrome, Edge, Opera); Safari and Firefox fall back to the
-export files below, and the panel says so rather than showing a button that
-cannot work.
-
 **Back up all trees** writes your whole shelf into one file. Import reads it
 back, so a new browser can be restored in one step.
 
@@ -119,7 +98,12 @@ back, so a new browser can be restored in one step.
 |---|---|
 | **JSON** | the whole tree, the only form that can be imported back |
 | **SVG** | a vector drawing of the canvas, portraits and all, in one file |
-| **PNG** | the same drawing as an image, rendered at 2× |
+| **Detailed SVG** | a proper chart: large portraits, room for long names, full dates with day and month, birthplace, a two-line "known for", and how many chapters each book holds |
+| **PNG** | the canvas drawing as an image, rendered at 2× |
+
+The detailed export scales the arrangement up around its much bigger cards, so
+the layout you built is preserved without them colliding. A sparse person gets a
+sparse card — rows appear only where there is something to show.
 
 **Import** reads JSON only — a picture cannot be turned back into a family tree
 — and always opens as a *new* tree, so an import can never overwrite your work.
@@ -134,7 +118,8 @@ copies of anyone's diaries.
 `N` new person · `A` tidy up · `F` fit to screen · `Enter` open book ·
 `Del` remove the selected person or link · `Esc` deselect ·
 `Ctrl+Z` / `Ctrl+Shift+Z` undo, redo · drag background to pan ·
-`Ctrl+scroll` to zoom.
+`Ctrl+scroll` to zoom; the toolbar shows the current zoom, and clicking it
+snaps back to 100%.
 
 ## Layout
 
@@ -143,12 +128,11 @@ index.html        markup for the canvas, the book, the menus and dialogs
 styles.css        all of the styling
 js/state.js       the document, graph queries and edits, undo
 js/library.js     the shelf: many trees in localStorage, and migration
-js/filelink.js    linking a tree to a file on disk, autosave, sync detection
 js/photo.js       cropping and downscaling a picked file into a portrait
 js/layout.js      the "Tidy up" engine — generations, then a tidy x-pass
 js/tree.js        canvas: rendering, pan/zoom, dragging, snapping, edges
 js/book.js        the two-page life book
-js/exchange.js    export to JSON/SVG/PNG, import from JSON
+js/exchange.js    export to JSON/SVG/detailed SVG/PNG, import from JSON
 js/main.js        toolbar, tree picker, keyboard, startup
 server.js         optional zero-dependency static file server
 test/             npm test — five jsdom suites plus a real-browser pass
@@ -156,14 +140,11 @@ test/             npm test — five jsdom suites plus a real-browser pass
 
 ## What a prototype this size doesn't do yet
 
-- **An unlinked tree lives in one browser only.** Trees are kept in
-  `localStorage`, which does not follow you to another browser or device and does
-  not survive clearing site data. The app asks for persistent storage so it is
-  not evicted under disk pressure, but the real answer is to link the tree to a
-  file, or to keep a backup.
-- **A linked file is for one person at a time.** Newer wins, and nothing is
-  merged, so this is for you moving between your own computers — not two people
-  editing one tree.
+- **Trees live in one browser.** They are kept in `localStorage`, which does not
+  follow you to another browser or device and does not survive clearing site
+  data. The app asks for persistent storage so it is not evicted under disk
+  pressure, but "Back up all trees" is the real answer — and the only way to move
+  a shelf between machines.
 - **No sharing.** To give someone a tree you send them the file. There is
   deliberately no upload, no link, and nothing holding copies of anyone's
   diaries — but equally no way for two people to work on the same tree.
@@ -198,9 +179,9 @@ npx playwright install chromium   # once, for the browser suite
 npm test                          # or: npm test browser
 ```
 
-Seven suites, run against a real instance of the app: the document model and
-layout, the tree shelf, the wired-up page, export/import, the file link, photos,
-and a real-Chromium pass.
+Six suites, run against a real instance of the app: the document model and
+layout, the tree shelf, the wired-up page, export/import, photos, and a
+real-Chromium pass.
 
 That last one earns its keep. The first five run in `jsdom`, which does no
 layout and no hit-testing — it once reported a page as fine while every click

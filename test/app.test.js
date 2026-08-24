@@ -23,7 +23,7 @@ module.exports = async function (t, h) {
   t.ok($$('#edges path.edge-hit').length === expectedEdges, 'each with a hit target');
   t.ok($('#edges path.edge').getAttribute('d').length > 8, 'connector paths have geometry');
   t.ok($$('#edges .union-mark').length === 3, 'a union marker per couple');
-  t.ok($$('.card .entry-count:not([hidden])').length === 3, 'diary badges only on people with entries');
+  t.ok($$('.card .entry-count').length === 0, 'cards carry no chapter badge');
   t.ok($('#treeTitle').value === FT.state.title, 'title field is bound to the document');
   t.ok($$('.card .dates')[0].textContent.trim().length <= 12, 'cards show years, not full dates');
 
@@ -138,7 +138,7 @@ module.exports = async function (t, h) {
     FT.state.people[josip].entries.some((e) => e.body === 'Rewritten by the test.'),
     'typing writes through to the document'
   );
-  t.ok($('#wordCount').textContent === '4 words', 'the word count updates');
+  t.ok(!$('#wordCount'), 'the chapter page has no word counter');
 
   const nameEl = $('#pageLeft .person-name');
   nameEl.value = 'Josip K.';

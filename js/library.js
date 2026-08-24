@@ -114,6 +114,27 @@
     return true;
   };
 
+  /* Ask the browser to stop treating this data as disposable. Without it,
+     storage can be evicted under disk pressure with no warning. */
+  FT.requestPersistence = async function () {
+    if (!navigator.storage || !navigator.storage.persist) return false;
+    try {
+      if (await navigator.storage.persisted()) return true;
+      return await navigator.storage.persist();
+    } catch (e) {
+      return false;
+    }
+  };
+
+  FT.storageEstimate = async function () {
+    if (!navigator.storage || !navigator.storage.estimate) return null;
+    try {
+      return await navigator.storage.estimate();
+    } catch (e) {
+      return null;
+    }
+  };
+
   /* Which tree to show on load: the last one open, else the newest, else none. */
   FT.pickStartupDoc = function () {
     const last = FT.lastDocId();

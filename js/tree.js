@@ -27,6 +27,7 @@
     stage.style.backgroundPosition = view.x + 'px ' + view.y + 'px';
     positionPill();
     positionEdgePill();
+    FT.emit('zoom', { z: view.z });
   }
 
   function screenToWorld(sx, sy) {
@@ -44,6 +45,20 @@
     view.y = py - ((py - view.y) / view.z) * next;
     view.z = next;
     applyView();
+  };
+
+  FT.zoomTo = function (z) {
+    const r = stage.getBoundingClientRect();
+    const next = Math.min(2.5, Math.max(0.25, z));
+    // Keep the centre of the view fixed.
+    view.x = r.width / 2 - ((r.width / 2 - view.x) / view.z) * next;
+    view.y = r.height / 2 - ((r.height / 2 - view.y) / view.z) * next;
+    view.z = next;
+    applyView();
+  };
+
+  FT.zoomLevel = function () {
+    return view.z;
   };
 
   FT.fitToScreen = function () {
@@ -65,7 +80,8 @@
   function cardHtml(p) {
     const avatar = p.photo
       ? '<div class="avatar has-photo"><img src="' + p.photo + '" alt=""></div>'
-      : '<div class="avatar">' + FT.escapeHtml(FT.initials(p.name)) + '</div>';
+      : '<div class="avatar"><span class="initials">' +
+        FT.escapeHtml(FT.initials(p.name)) + '</span></div>';
     return (
       avatar +
       '<div class="meta">' +
@@ -79,8 +95,7 @@
           '<path d="M8 7.5h7M8 11h7" stroke="currentColor" stroke-width="1.5" ' +
             'stroke-linecap="round"/>' +
         '</svg>' +
-      '</button>' +
-      '<span class="entry-count" title="diary entries"></span>'
+      '</button>'
     );
   }
 
@@ -101,7 +116,7 @@
       // Only rebuild the card when its contents actually changed — otherwise
       // every render re-decodes the portrait and the photo visibly flickers.
       const sig = [
-        p.name, p.birth, p.death, p.gender, p.entries.length,
+        p.name, p.birth, p.death, p.gender,
         p.photo.length, p.photo.slice(-24),
       ].join('');
       if (el.dataset.sig !== sig) {
@@ -112,13 +127,6 @@
       el.dataset.gender = p.gender;
       el.classList.toggle('selected', FT.selected === p.id);
 
-      const count = el.querySelector('.entry-count');
-      if (p.entries.length) {
-        count.textContent = p.entries.length;
-        count.hidden = false;
-      } else {
-        count.hidden = true;
-      }
       live[p.id] = true;
     });
 
@@ -156,14 +164,22 @@
   }
 
   /* The geometry of every relationship, shared by the canvas renderer and the
-     SVG export so a downloaded drawing matches what is on screen. */
-  FT.edgeGeometry = function () {
+     SVG exports so a downloaded drawing matches what is on screen.
+
+     `layout` lets a caller supply its own positions and card size — the
+     detailed export draws much larger cards on a scaled-up copy of the same
+     arrangement, and needs connectors that match. */
+  FT.edgeGeometry = function (layout) {
+    const lay = layout || {};
+    const people = lay.people || FT.state.people;
+    const CARD_W = lay.cardW || FT.CARD_W;
+    const CARD_H = lay.cardH || FT.CARD_H;
     const out = [];
 
     FT.unionList().forEach(function (u) {
       const partners = u.partners
         .map(function (id) {
-          return FT.state.people[id];
+          return people[id];
         })
         .filter(Boolean);
       if (!partners.length) return;
@@ -175,10 +191,10 @@
         const a = partners[0];
         const b = partners[1];
         crossGen = FT.isCrossGenerationUnion(u);
-        const midY = (a.y + b.y) / 2 + FT.CARD_H / 2;
+        const midY = (a.y + b.y) / 2 + CARD_H / 2;
         const leftP = a.x <= b.x ? a : b;
         const rightP = a.x <= b.x ? b : a;
-        const x1 = leftP.x + FT.CARD_W;
+        const x1 = leftP.x + CARD_W;
         const x2 = rightP.x;
         let d;
 
@@ -186,9 +202,9 @@
           // Rows apart: a squared-off bar would stride across whole generations
           // and read as a mistake, so curve between the facing edges instead.
           const sx = x1;
-          const sy = leftP.y + FT.CARD_H / 2;
-          const ex = x2 > x1 ? x2 : rightP.x + FT.CARD_W;
-          const ey = rightP.y + FT.CARD_H / 2;
+          const sy = leftP.y + CARD_H / 2;
+          const ex = x2 > x1 ? x2 : rightP.x + CARD_W;
+          const ey = rightP.y + CARD_H / 2;
           const bow = Math.max(70, Math.abs(ex - sx) / 2);
           d = 'M' + sx + ' ' + sy +
               'C' + (sx + bow) + ' ' + sy + ',' + (ex - bow) + ' ' + ey + ',' + ex + ' ' + ey;
@@ -197,18 +213,18 @@
           anchorX = (sx + ex) / 2;
           anchorY = (sy + ey) / 2;
         } else if (x2 > x1) {
-          d = 'M' + x1 + ' ' + (leftP.y + FT.CARD_H / 2) +
+          d = 'M' + x1 + ' ' + (leftP.y + CARD_H / 2) +
               'H' + (x1 + x2) / 2 + 'V' + midY +
-              'H' + x2 + 'V' + (rightP.y + FT.CARD_H / 2);
-          anchorX = (a.x + b.x) / 2 + FT.CARD_W / 2;
+              'H' + x2 + 'V' + (rightP.y + CARD_H / 2);
+          anchorX = (a.x + b.x) / 2 + CARD_W / 2;
           anchorY = midY;
         } else {
           // Cards overlap horizontally — the bar would run backwards, so route
           // it underneath both instead.
-          d = 'M' + (leftP.x + FT.CARD_W / 2) + ' ' + (leftP.y + FT.CARD_H) +
-              'V' + (Math.max(a.y, b.y) + FT.CARD_H + 24) +
-              'H' + (rightP.x + FT.CARD_W / 2) + 'V' + (rightP.y + FT.CARD_H);
-          anchorX = (a.x + b.x) / 2 + FT.CARD_W / 2;
+          d = 'M' + (leftP.x + CARD_W / 2) + ' ' + (leftP.y + CARD_H) +
+              'V' + (Math.max(a.y, b.y) + CARD_H + 24) +
+              'H' + (rightP.x + CARD_W / 2) + 'V' + (rightP.y + CARD_H);
+          anchorX = (a.x + b.x) / 2 + CARD_W / 2;
           anchorY = midY;
         }
 
@@ -217,13 +233,13 @@
           mark: { x: anchorX, y: anchorY }, mid: { x: anchorX, y: anchorY },
         });
       } else {
-        anchorX = partners[0].x + FT.CARD_W / 2;
-        anchorY = partners[0].y + FT.CARD_H;
+        anchorX = partners[0].x + CARD_W / 2;
+        anchorY = partners[0].y + CARD_H;
       }
 
       const children = u.children
         .map(function (id) {
-          return FT.state.people[id];
+          return people[id];
         })
         .filter(Boolean);
       if (!children.length) return;
@@ -232,7 +248,7 @@
       const busY = Math.max(anchorY + 40, topChildY - 40);
 
       children.forEach(function (c) {
-        const cx = c.x + FT.CARD_W / 2;
+        const cx = c.x + CARD_W / 2;
         out.push({
           kind: 'child',
           unionId: u.id,

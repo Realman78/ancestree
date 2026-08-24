@@ -50,6 +50,76 @@ module.exports = async function (t, h) {
   t.ok(/href="data:image\/png;base64,/.test(photoSvg), 'embedded inline, so the file stands alone');
   t.ok(/clip-path="url\(#clip-/.test(photoSvg), 'clipped to the portrait circle');
 
+  t.section('the detailed SVG');
+  // Give the sample enough detail that every part of the card is exercised.
+  // An earlier section renamed the first person to test escaping; put it back
+  // so the card reads normally here.
+  const josip = Object.keys(FT.state.people).find((i) => FT.state.people[i].birth === '1921-03-14');
+  FT.state.people[josip].name = 'Josip Kovač';
+  FT.state.people[josip].knownFor =
+    'Village blacksmith for forty years, who reopened the forge after the war ' +
+    'and made the iron gate that still stands in the square at Sinj.';
+  const detail = FT.buildDetailedSvg();
+
+  const dParsed = new w.DOMParser().parseFromString(detail, 'image/svg+xml');
+  t.ok(!dParsed.querySelector('parsererror'), 'parses as well-formed XML');
+  t.ok((detail.match(/<rect [^>]*rx="16"/g) || []).length === people.length,
+    'one detailed card per person');
+
+  t.ok(/BORN/.test(detail) && /DIED/.test(detail), 'has Born and Died labels');
+  t.ok(/14 March 1921/.test(detail), 'dates carry the day and month, not just the year');
+  t.ok(/2 November 1998/.test(detail), 'including the death date');
+  t.ok(/FROM/.test(detail) && /Sinj, Croatia/.test(detail), 'shows where they were from');
+  t.ok(/KNOWN FOR/.test(detail), 'has a known-for section');
+  t.ok(/2 CHAPTERS/.test(detail) && /1 CHAPTER/.test(detail),
+    'counts chapters, singular and plural');
+
+  // Two lines of known-for, ellipsed rather than overflowing the card.
+  const knownLines = (detail.match(/font-size="12.5" fill="#3b332a">[^<]*</g) || []);
+  t.ok(knownLines.length > 0, 'known-for is drawn as text lines');
+  t.ok(/…/.test(detail), 'and long text is ellipsed to fit two rows');
+
+  t.ok(/font-size="20"/.test(detail), 'names are set larger than the plain export');
+  t.ok(/r="38"/.test(detail), 'portraits are larger too');
+  t.ok(/dominant-baseline="central"/.test(detail), 'initials are centred in their circle');
+
+  const plainW = Number(/width="(\d+)"/.exec(svg)[1]);
+  const detailW = Number(/width="(\d+)"/.exec(detail)[1]);
+  t.ok(detailW > plainW, 'the chart is scaled up to fit the bigger cards (' +
+    plainW + ' → ' + detailW + ')');
+
+  // The layout must survive the scale-up without cards colliding.
+  const boxes = FT.peopleList().map((p) => ({ x: p.x * 1.85, y: p.y * 1.85 }));
+  let clashes = 0;
+  for (let i = 0; i < boxes.length; i++)
+    for (let j = i + 1; j < boxes.length; j++)
+      if (Math.abs(boxes[i].x - boxes[j].x) < 340 && Math.abs(boxes[i].y - boxes[j].y) < 244) clashes++;
+  t.ok(clashes === 0, 'no two detailed cards overlap');
+
+  t.ok(FT.edgeGeometry({ people: {}, cardW: 340, cardH: 244 }).length === 0,
+    'edge geometry accepts a supplied layout');
+
+  t.section('a sparse person gets a sparse card');
+  const bare = FT.normalize({
+    title: 'x', people: { b1: { name: 'Unknown Ancestor' } }, unions: {},
+  });
+  const savedState = FT.state;
+  FT.state = bare;
+  const bareSvg = FT.buildDetailedSvg();
+  FT.state = savedState;
+  t.ok(!/BORN/.test(bareSvg), 'no Born row when there is no birth date');
+  t.ok(!/KNOWN FOR/.test(bareSvg), 'no known-for section when nothing is written');
+  t.ok(!/CHAPTER/.test(bareSvg), 'no chapter count when the book is empty');
+  t.ok(/Unknown Ancestor/.test(bareSvg), 'but the person is still drawn');
+
+  t.section('detailed SVG escaping');
+  FT.state.people[josip].birthplace = 'Sinj <script>alert(1)</script>';
+  const hostileDetail = FT.buildDetailedSvg();
+  t.ok(hostileDetail.indexOf('<script>') < 0, 'markup in a field cannot break out');
+  t.ok(!new w.DOMParser().parseFromString(hostileDetail, 'image/svg+xml')
+    .querySelector('parsererror'), 'and the file stays well-formed');
+  FT.state.people[josip].birthplace = 'Sinj, Croatia';
+
   t.section('an empty tree exports nothing');
   const empty = await h.loadPage();
   empty.window.FT.exportSvg();
@@ -58,6 +128,7 @@ module.exports = async function (t, h) {
     /Nothing to export/.test(empty.window.document.getElementById('hintText').textContent),
     'it says so rather than writing an empty file'
   );
+  t.ok(empty.window.FT.exportDetailedSvg() === false, 'and the detailed export refuses too');
 
   t.section('import is JSON only, into its own tree');
   const before = FT.listDocs().length;

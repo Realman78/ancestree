@@ -42,12 +42,7 @@
   }
 
   function prettyDate(iso) {
-    if (!iso) return 'Undated';
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-    if (!m) return iso;
-    const months = ['January','February','March','April','May','June','July',
-                    'August','September','October','November','December'];
-    return Number(m[3]) + ' ' + months[Number(m[2]) - 1] + ' ' + m[1];
+    return iso ? FT.prettyDate(iso) : 'Undated';
   }
 
   /* "2 June 1946", or "2 June 1946 – 15 September 1946" for a chapter that spans. */
@@ -299,11 +294,9 @@
       '<input class="entry-title" value="' + FT.escapeHtml(e.title) +
         '" placeholder="Chapter title">' +
       '<textarea class="entry-body" placeholder="Write it down before it is lost…">' +
-        FT.escapeHtml(e.body) + '</textarea>' +
-      '<div class="entry-foot"><span id="wordCount"></span></div>';
+        FT.escapeHtml(e.body) + '</textarea>';
 
     autoGrow(rightPage.querySelector('.entry-body'));
-    updateWordCount();
     checkDates();
 
     if (flip) {
@@ -328,14 +321,6 @@
     const bad = !!(e.end && e.date && e.end < e.date);
     warn.hidden = !bad;
     warn.textContent = bad ? 'This chapter ends before it starts.' : '';
-  }
-
-  function updateWordCount() {
-    const el = document.getElementById('wordCount');
-    if (!el) return;
-    const e = entry();
-    const words = e && e.body.trim() ? e.body.trim().split(/\s+/).length : 0;
-    el.textContent = words === 1 ? '1 word' : words + ' words';
   }
 
   // ---------------------------------------------------------------- public
@@ -521,7 +506,6 @@
       FT.checkpoint('entry-body:' + e.id);
       e.body = t.value;
       autoGrow(t);
-      updateWordCount();
       touch();
     } else if (t.classList.contains('entry-date')) {
       FT.checkpoint('entry-date:' + e.id);

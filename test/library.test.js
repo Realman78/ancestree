@@ -69,6 +69,12 @@ module.exports = async function (t, h) {
   t.ok(!FT.loadDoc(secondId), 'and from storage');
   t.ok(FT.state.id === firstId, 'the open tree is unaffected');
 
+  t.section('the tree menu');
+  $('#treeMenuBtn').click();
+  await h.wait(120);
+  t.ok(!$('#fileStatus'), 'there is no "this tree on disk" panel');
+  t.ok(!!$('[data-action="backupAll"]'), 'but backing every tree up is still offered');
+
   t.section('the shelf survives a reload');
   const again = await h.loadPage();
   t.ok(again.window.FT.listDocs().length >= 0, 'a fresh browser profile starts with its own shelf');
