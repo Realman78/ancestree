@@ -1,10 +1,10 @@
 # Heirloom — family tree prototype
 
 A family tree you can lay out by hand, where every person carries a diary of
-their life, and the whole thing can be handed to someone else with a link.
+their life.
 
-No build step, no accounts, and nothing to install to run it — the dependencies
-in `package.json` are only for the tests.
+Everything stays in your browser. No accounts, no server, no build step —
+the dependencies in `package.json` are only for the tests.
 
 ## Run it
 
@@ -14,13 +14,15 @@ Either open `index.html` in a browser, or:
 node server.js          # http://localhost:5173
 ```
 
-The server is optional. It only adds short share links and a normal `http://`
-origin (which makes saving and the clipboard behave better than `file://`).
+The server is optional and stores nothing — it just serves the folder over
+`http`, which gives saving and downloads a normal origin to work with. The app
+is a static site: any host will do.
 
-The first run loads a sample family so there is something to poke at. Your work
-is saved to the browser automatically — "Start fresh" in the bottom bar clears it.
+**Your first visit is an empty board.** "Load sample family" in the bottom bar
+fills it with the Kovačs if you want something to poke at first; it asks before
+replacing a board that already has people on it.
 
-## The three pieces you asked for
+## What it does
 
 **Graphs that snap into place.** Drag any card. It snaps to the 20px grid, and
 when it comes within range of another card's edge it magnets onto that line —
@@ -36,15 +38,16 @@ refused.
 **The lines are relationships, and you can click them.** A selected line
 highlights along its whole route and offers **Remove link**; `Del` does the same.
 Removing a partner line separates the couple — if they had children the union
-stays with the first partner, so nobody is orphaned. Removing a child line
+stays with the left-hand partner, so nobody is orphaned. Removing a child line
 detaches that person from their parents and leaves them on the canvas.
 
 **Nothing asks "are you sure".** Browsers can suppress dialogs, and a suppressed
 `confirm()` returns false, which meant deleting quietly did nothing at all.
 So every destructive step just happens, says what it did, and offers **Undo** in
 the toast right where the loss occurred — with **Undo**/**Redo** in the toolbar
-and `Ctrl+Z` / `Ctrl+Shift+Z` as well. That covers replacing the whole tree too:
-"Start fresh" and "Sample family" act immediately and are both undoable.
+and `Ctrl+Z` / `Ctrl+Shift+Z` as well. Where a step genuinely cannot be undone —
+deleting a whole tree — an in-app dialog asks first. Not the browser's, so a
+blocked dialog cannot swallow it.
 
 **Partners from different generations** — someone partnered with a descendant —
 are rare but real, and are drawn as a dashed curve instead of the usual squared
@@ -54,7 +57,7 @@ and partnering never rewrites who anyone's parents are.
 **Photos.** Drag an image file straight onto a card, or open someone's book and
 click their portrait. The picture is cropped square and downscaled to a 256px
 thumbnail before it is stored — a 240 KB photo lands at about 4 KB — so trees
-stay small enough to fit in a link. People without a photo keep their initials.
+stay small in the browser. People without a photo keep their initials.
 "Remove photo" in the book puts them back.
 
 **A book for each life.** Click the book icon on a card, or double-click it.
@@ -62,8 +65,10 @@ The left page is who they were and a table of contents; the right page is the
 open chapter, on ruled paper, which you just type into. It saves as you write.
 The badge on a card counts the chapters in their book.
 
-Born and Died are date pickers, with a `≈` button beside each (it appears when
-you hover the row) that swaps in a plain text box for the dates genealogy is
+**Gender** is a field on each person (Woman / Man / Unspecified) that sets the
+card's tint and matches the legend in the bottom bar.
+
+Born and Died are date pickers, with a `≈` button beside each that swaps in a plain text box for the dates genealogy is
 actually made of — `c. 1880`, `spring 1943`, `before the war`. The field
 remembers which kind it is by looking at the value, so an approximate date stays
 editable as text next time you open the book. Switching back to the picker never
@@ -79,18 +84,26 @@ A chapter has a start date and, if you want one, an **end date** — press
 mark a spanning chapter with `→`, and an end date that falls before the start
 is refused rather than stored.
 
-**Sharing.** Press **Share** for a link. Anyone who opens it gets a read-only
-copy of the tree *and* every life book in it, with a "Make a copy I can edit"
-button if they want their own. Your tree is untouched by whatever they do.
+**Many trees, one browser.** The count beside the title opens your shelf: every
+tree you have made, newest first, with how many people are in each. **+ New
+tree** opens an empty board — it never touches the one you were on — and each
+tree is stored separately. Deleting one asks first, and that is the single
+action here that undo cannot reach.
 
-With the server running, the link is short (`#s=63c051c9`) and the snapshot
-lives in `./shares/` — delete a file there to revoke that link. Without it, the
-whole tree is packed into the link itself (`#d=…`), which means it works from a
-plain file with no server at all; a nine-person family with diaries comes to
-about 1.5 KB. Photos are the one thing heavy enough to matter there, so when a
-tree has any, the share dialog shows what they cost and lets you leave them out
-of that link — your own copy keeps them either way. There is also Export/Import
-for a `.json` file.
+**Getting a tree out.** **Export** offers three forms:
+
+| | |
+|---|---|
+| **JSON** | the whole tree, the only form that can be imported back |
+| **SVG** | a vector drawing of the canvas, portraits and all, in one file |
+| **PNG** | the same drawing as an image, rendered at 2× |
+
+**Import** reads JSON only — a picture cannot be turned back into a family tree
+— and always opens as a *new* tree, so an import can never overwrite your work.
+
+There is no sharing feature. Send someone the JSON (or the picture) and they can
+open it themselves; nothing is uploaded anywhere, and there is no server holding
+copies of anyone's diaries.
 
 ## Keys
 
@@ -102,37 +115,40 @@ for a `.json` file.
 ## Layout
 
 ```
-index.html        markup for the canvas, book and share dialog
+index.html        markup for the canvas, the book, the menus and dialogs
 styles.css        all of the styling
-js/state.js       the document, graph queries and edits, undo, saving
+js/state.js       the document, graph queries and edits, undo
+js/library.js     the shelf: many trees in localStorage, and migration
 js/photo.js       cropping and downscaling a picked file into a portrait
 js/layout.js      the "Tidy up" engine — generations, then a tidy x-pass
-js/tree.js        canvas: rendering, pan/zoom, dragging, snapping, guides
+js/tree.js        canvas: rendering, pan/zoom, dragging, snapping, edges
 js/book.js        the two-page life book
-js/share.js       link encoding, export/import, opening a shared tree
-server.js         optional zero-dependency static server + share storage
+js/exchange.js    export to JSON/SVG/PNG, import from JSON
+js/main.js        toolbar, tree picker, keyboard, startup
+server.js         optional zero-dependency static file server
 test/             npm test — five jsdom suites plus a real-browser pass
 ```
 
 ## What a prototype this size doesn't do yet
 
-- **Sharing is a snapshot, not a live document.** Press Share again after making
-  changes and you get a new link; the old one still shows the older tree. Shared
-  links are also read-only by design — there is no collaborative editing, and no
-  accounts, so a link *is* the permission. Anyone who has it can read everything.
-- **Share storage is a folder of files** with no expiry and no access control.
-  Fine on your own machine; it is not ready to face the internet as-is.
+- **Everything lives in one browser.** Trees are in `localStorage`, so they do
+  not follow you to another browser, another device, or survive clearing site
+  data. There is no sync and no accounts. Export is the only real backup.
+- **No sharing.** To give someone a tree you send them the file. There is
+  deliberately no upload, no link, and nothing holding copies of anyone's
+  diaries — but equally no way for two people to work on the same tree.
 - **One partnership per couple.** A person can have several partners, but
   remarriages and step-families draw as separate unions rather than anything
   cleverer, and a child belongs to exactly one union.
-- **Separating a couple keeps the children with the first partner**, which is
-  arbitrary — there is no way to choose, or to split them between the two.
+- **Separating a couple keeps the children with the left-hand partner.** That is
+  at least predictable from the canvas, but there is no way to choose the other
+  one, or to split them between the two.
 - **A cross-generation link routes as the crow flies** and can pass behind other
   cards. It is legible and clearly marked, but not routed around obstacles.
 - **Photos are stored inside the document**, not as files, and only the
   thumbnail is kept — the original resolution is gone once you drop it in. That
-  keeps sharing and export self-contained, but it is not somewhere to archive
-  the only copy of a family photograph. One portrait per person, no albums.
+  keeps export self-contained, but it is not somewhere to archive the only copy
+  of a family photograph. One portrait per person, no albums.
 - **Browser storage is finite** (a few MB). A tree with many photos can reach
   it; the app now says so plainly instead of failing quietly, but the fix is to
   Export.
@@ -153,8 +169,8 @@ npm test                          # or: npm test browser
 ```
 
 Six suites, run against a real instance of the app: the document model and
-layout, share-link encoding, the wired-up page, sharing end to end, photos, and
-a real-Chromium pass.
+layout, the tree shelf, the wired-up page, export/import, photos, and a
+real-Chromium pass.
 
 That last one earns its keep. The first five run in `jsdom`, which does no
 layout and no hit-testing — it once reported a page as fine while every click

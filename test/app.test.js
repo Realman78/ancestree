@@ -9,6 +9,9 @@ module.exports = async function (t, h) {
   const $$ = (s) => Array.from(d.querySelectorAll(s));
 
   t.section('boot');
+  t.ok($$('.card').length === 0, 'the board starts empty');
+  $('[data-action="demo"]').click();
+  await h.wait(200);
   t.ok(dom.errors.length === 0, 'no runtime errors on load' + (dom.errors.length ? ': ' + dom.errors[0] : ''));
   const nPeople = Object.keys(FT.state.people).length;
   t.ok($$('.card').length === nPeople, 'one card per person (' + nPeople + ')');
@@ -71,20 +74,17 @@ module.exports = async function (t, h) {
   t.section('replacing the whole tree is recoverable');
   // "Start fresh" and "Sample family" no longer ask either, so a stray click
   // must not be the end of someone's tree.
-  const beforeReset = JSON.stringify(FT.state.people);
-  const namesBefore = Object.keys(FT.state.people).length;
-  $('[data-action="reset"]').click();
-  t.ok(Object.keys(FT.state.people).length === 1, '"Start fresh" empties the tree without asking');
+  const beforeReplace = JSON.stringify(FT.state.people);
+  $('[data-action="demo"]').click();
+  await h.wait(150);
+  t.ok(!$('#askDialog').hidden, 'loading the sample over a full board asks first');
+  $('#askOk').click();
+  await h.wait(250);
+  t.ok(JSON.stringify(FT.state.people) !== beforeReplace, 'confirming replaces the board');
   t.ok(!$('#hintUndo').hidden, 'and offers Undo');
   $('#hintUndo').click();
-  t.ok(Object.keys(FT.state.people).length === namesBefore, 'undo brings the whole tree back');
-  t.ok(JSON.stringify(FT.state.people) === beforeReset, 'intact, down to every person');
-
-  $('[data-action="demo"]').click();
-  t.ok(!$('#hintUndo').hidden, '"Sample family" is undoable too');
-  $('#hintUndo').click();
-  t.ok(JSON.stringify(FT.state.people) === beforeReset, 'and restores what was there');
-  t.ok(w.__confirmCalls === 0, 'still no dialogs anywhere');
+  t.ok(JSON.stringify(FT.state.people) === beforeReplace, 'undo restores what was there, person for person');
+  t.ok(w.__confirmCalls === 0, 'no browser dialog was used for any of it');
 
   t.section('relationship lines are selectable and removable');
   const partnerUnion = FT.unionList().find((u) => u.partners.length === 2 && u.children.length);
@@ -95,11 +95,14 @@ module.exports = async function (t, h) {
   t.ok(/&/.test(FT.edgeLabel(FT.selectedEdge)), 'the line is labelled with both names');
 
   const keptChildren = partnerUnion.children.slice();
-  const keeper = partnerUnion.partners[0];
-  const dropped = partnerUnion.partners[1];
+  // The keeper is whoever is drawn on the left, so the result matches the canvas.
+  const keeper = partnerUnion.partners
+    .slice()
+    .sort((a, b) => FT.state.people[a].x - FT.state.people[b].x)[0];
+  const dropped = partnerUnion.partners.find((id) => id !== keeper);
   $('#edgePill [data-action="removeEdge"]').click();
   t.ok(FT.state.unions[partnerUnion.id].partners.length === 1, 'removing a partner line separates the couple');
-  t.ok(FT.state.unions[partnerUnion.id].partners[0] === keeper, 'the union stays with the first partner');
+  t.ok(FT.state.unions[partnerUnion.id].partners[0] === keeper, 'the union stays with the left-hand partner');
   t.ok(
     keptChildren.every((c) => FT.parentsOf(c).includes(keeper)),
     'their children keep that parent rather than being orphaned'
@@ -150,41 +153,25 @@ module.exports = async function (t, h) {
   FT.closeBook();
 
   t.section('persistence');
+  FT.save();
+  const reloaded = FT.loadDoc(FT.state.id);
+  t.ok(!!reloaded, 'the open tree is written to its own storage entry');
+  t.ok(reloaded.people[josip].name === 'Josip K.', 'edits are saved');
   t.ok(
-    JSON.parse(w.localStorage.getItem('heirloom.tree.v1')).people[josip].name === 'Josip K.',
-    'edits are saved to localStorage'
+    FT.listDocs().some((row) => row.id === FT.state.id),
+    'and it appears on the shelf'
   );
 
-  t.section('read-only (what a recipient sees)');
-  FT.adoptDocument(FT.normalize(FT.demoTree()), true);
-  t.ok(d.body.classList.contains('read-only'), 'read-only mode engages');
-  t.ok(!$('#roBanner').hidden, 'a banner explains the tree is shared');
-  t.ok($('#pill').hidden, 'the editing pill is hidden');
-  t.ok($('#treeTitle').disabled, 'the title cannot be renamed');
-  FT.openBook(Object.keys(FT.state.people)[0]);
-  t.ok(!$('#pageLeft input') && !$('#pageRight textarea'), 'the book has no editable fields');
-  t.ok($$('#pageLeft .pf-value').length > 0, 'but the facts are still shown');
-  t.ok(!$('#pageLeft .pf-clampwrap.editable'), '"Known for" is not editable either');
-  FT.closeBook();
-  t.ok(
-    !!JSON.parse(w.localStorage.getItem('heirloom.tree.v1')).people[josip],
-    'viewing a shared tree does not overwrite my own saved tree'
-  );
-
-  $('[data-action="copyToMine"]').click();
-  t.ok(!d.body.classList.contains('read-only'), '"Make a copy" hands back an editable tree');
-  t.ok(FT.state.title.endsWith('(copy)'), 'and names it as a copy');
-
-  t.section('hostile input from a shared link');
+  t.section('hostile input from an imported file');
   const evil = FT.normalize({
     title: 'x',
     people: { e1: { name: '<img src=x onerror="window.__pwned=1">', knownFor: '<script>window.__pwned=1<\/script>' } },
     unions: {},
   });
-  FT.adoptDocument(evil, true);
+  FT.adoptDocument(evil);
   FT.openBook('e1');
   t.ok(!w.__pwned, 'no script runs from a malicious name');
   t.ok(d.querySelectorAll('#nodes img, #pageLeft img').length === 0, 'markup is escaped, not injected');
-  t.ok($('#pageLeft .person-name').textContent.includes('<img'), 'it renders as literal text');
+  t.ok($('#pageLeft .person-name').value.includes('<img'), 'it sits in the field as literal text');
   FT.closeBook();
 };

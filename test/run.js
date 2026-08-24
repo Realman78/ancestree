@@ -8,9 +8,9 @@ const h = require('./helpers');
 
 const SUITES = [
   { name: 'model', file: './model.test.js' },
-  { name: 'share', file: './share.test.js' },
+  { name: 'library', file: './library.test.js' },
   { name: 'app', file: './app.test.js' },
-  { name: 'share-link', file: './share-link.test.js' },
+  { name: 'export', file: './export.test.js' },
   { name: 'photo', file: './photo.test.js' },
   { name: 'browser', file: './browser.test.js', needsBrowser: true },
 ];

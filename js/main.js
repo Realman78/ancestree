@@ -4,7 +4,6 @@
 
   const titleInput = document.getElementById('treeTitle');
   const hint = document.getElementById('hint');
-  const banner = document.getElementById('roBanner');
   const importInput = document.getElementById('importFile');
 
   const hintText = document.getElementById('hintText');
@@ -17,13 +16,58 @@
     hintText.textContent = payload.text;
     // Destructive steps no longer ask first, so the way back has to be offered
     // at the moment of loss, not just in the toolbar.
-    hintUndo.hidden = !payload.undo || FT.readOnly;
+    hintUndo.hidden = !payload.undo;
     hint.classList.add('show');
     clearTimeout(hintTimer);
     hintTimer = setTimeout(function () {
       hint.classList.remove('show');
     }, payload.undo ? 7000 : 3200);
   });
+
+  /* An in-app replacement for confirm(). The native one returns false when a
+     browser suppresses dialogs, which silently swallowed whatever it guarded. */
+  const askDialog = document.getElementById('askDialog');
+  const askTitle = document.getElementById('askTitle');
+  const askBody = document.getElementById('askBody');
+  const askOk = document.getElementById('askOk');
+  const askCancel = document.getElementById('askCancel');
+  let askResolve = null;
+
+  function ask(opts) {
+    return new Promise(function (resolve) {
+      askTitle.textContent = opts.title;
+      askBody.textContent = opts.body || '';
+      askBody.hidden = !opts.body;
+      askOk.textContent = opts.confirmLabel || 'OK';
+      askOk.classList.toggle('danger-btn', !!opts.danger);
+      askDialog.hidden = false;
+      askDialog.classList.add('open');
+      askResolve = resolve;
+      askOk.focus();
+    });
+  }
+
+  function closeAsk(answer) {
+    if (!askResolve) return;
+    const resolve = askResolve;
+    askResolve = null;
+    askDialog.classList.remove('open');
+    setTimeout(function () {
+      askDialog.hidden = true;
+    }, 160);
+    resolve(answer);
+  }
+
+  askOk.addEventListener('click', function () {
+    closeAsk(true);
+  });
+  askCancel.addEventListener('click', function () {
+    closeAsk(false);
+  });
+  askDialog.addEventListener('click', function (e) {
+    if (e.target === askDialog) closeAsk(false);
+  });
+  FT.ask = ask;
 
   function syncHistory() {
     undoBtn.disabled = !FT.canUndo();
@@ -38,24 +82,119 @@
     FT.save();
   });
 
-  /* Swap in a whole document — from a share link, an import, or "start over". */
-  FT.adoptDocument = function (doc, readOnly) {
+  /* Swap in a whole document — a different tree, an import, or the sample. */
+  FT.adoptDocument = function (doc) {
     FT.silently(function () {
       FT.state = doc;
-      FT.readOnly = !!readOnly;
       FT.selected = null;
       FT.selectedEdge = null;
     });
-    document.body.classList.toggle('read-only', FT.readOnly);
-    banner.hidden = !FT.readOnly;
     titleInput.value = FT.state.title;
-    titleInput.disabled = FT.readOnly;
     FT.resetCards();
     FT.render();
     FT.fitToScreen();
     syncHistory();
-    if (!FT.readOnly) FT.save();
+    FT.rememberLastDoc(doc.id);
+    FT.save();
+    renderTreeList();
   };
+
+  // --------------------------------------------------------- the tree shelf
+
+  const treeMenu = document.getElementById('treeMenu');
+  const treeMenuBtn = document.getElementById('treeMenuBtn');
+  const treeList = document.getElementById('treeList');
+  const treeCount = document.getElementById('treeCount');
+
+  function whenSaved(row) {
+    const when = new Date(row.updatedAt || 0);
+    const days = Math.floor((Date.now() - when.getTime()) / 86400000);
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    if (days < 30) return days + ' days ago';
+    return when.toISOString().slice(0, 10);
+  }
+
+  function renderTreeList() {
+    const rows = FT.listDocs();
+    treeCount.textContent = rows.length || 1;
+    treeList.innerHTML = rows.length
+      ? rows
+          .map(function (row) {
+            const current = row.id === FT.state.id;
+            return (
+              '<li><button class="tree-row' + (current ? ' current' : '') +
+                '" data-tree="' + FT.escapeHtml(row.id) + '">' +
+                '<span class="tree-row-name">' + FT.escapeHtml(row.title || 'Untitled') + '</span>' +
+                '<span class="tree-row-meta">' + row.people +
+                  (row.people === 1 ? ' person · ' : ' people · ') + whenSaved(row) + '</span>' +
+              '</button>' +
+              '<button class="tree-row-del" data-delete-tree="' + FT.escapeHtml(row.id) +
+                '" title="Delete this tree" aria-label="Delete ' +
+                FT.escapeHtml(row.title || 'Untitled') + '">&times;</button></li>'
+            );
+          })
+          .join('')
+      : '<li class="tree-empty">No saved trees yet.</li>';
+  }
+  FT.renderTreeList = renderTreeList;
+
+  function openTreeMenu(open) {
+    treeMenu.hidden = !open;
+    treeMenuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) renderTreeList();
+  }
+
+  treeMenuBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    openTreeMenu(treeMenu.hidden);
+  });
+
+  treeList.addEventListener('click', async function (e) {
+    const del = e.target.closest('[data-delete-tree]');
+    if (del) {
+      const id = del.dataset.deleteTree;
+      const row = FT.listDocs().find(function (r) {
+        return r.id === id;
+      });
+      const yes = await ask({
+        title: 'Delete “' + (row ? row.title : 'this tree') + '”?',
+        body: 'This tree and every life book in it will be gone. This one cannot be undone.',
+        confirmLabel: 'Delete tree',
+        danger: true,
+      });
+      if (!yes) return;
+      FT.deleteDoc(id);
+      if (id === FT.state.id) {
+        const next = FT.pickStartupDoc();
+        FT.adoptDocument(next || FT.newTree('Our Family'));
+      }
+      renderTreeList();
+      FT.emit('hint', { text: 'Tree deleted.' });
+      return;
+    }
+    const row = e.target.closest('[data-tree]');
+    if (!row) return;
+    const doc = FT.loadDoc(row.dataset.tree);
+    if (!doc) return;
+    FT.save(); // keep the current tree before leaving it
+    FT.adoptDocument(doc);
+    openTreeMenu(false);
+  });
+
+  document.addEventListener('click', function (e) {
+    if (!treeMenu.hidden && !e.target.closest('.tree-id')) openTreeMenu(false);
+    const exportMenu = document.getElementById('exportMenu');
+    if (!exportMenu.hidden && !e.target.closest('.menu-wrap')) exportMenu.hidden = true;
+  });
+
+  const exportBtn = document.getElementById('exportBtn');
+  exportBtn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    const menu = document.getElementById('exportMenu');
+    menu.hidden = !menu.hidden;
+    exportBtn.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
+  });
 
   // ------------------------------------------------------------- toolbar
 
@@ -126,7 +265,7 @@
        children keeps them with one parent, and people should be told which. */
     removeEdge: function () {
       const sel = FT.selectedEdge;
-      if (!sel || FT.readOnly) return;
+      if (!sel) return;
       const u = FT.state.unions[sel.unionId];
       if (!u) return;
       const nameOf = function (id) {
@@ -179,42 +318,50 @@
     zoomOut: function () {
       FT.zoomBy(1 / 1.2);
     },
-    share: function () {
-      FT.openShare();
-    },
     export: function () {
       FT.exportFile();
+      document.getElementById('exportMenu').hidden = true;
+    },
+    exportSvg: function () {
+      FT.exportSvg();
+      document.getElementById('exportMenu').hidden = true;
+    },
+    exportPng: function () {
+      FT.exportPng();
+      document.getElementById('exportMenu').hidden = true;
     },
     import: function () {
       importInput.click();
     },
-    copyToMine: function () {
-      const copy = FT.clone(FT.state);
-      copy.id = FT.uid('t');
-      copy.title = copy.title + ' (copy)';
-      history.replaceState(null, '', location.pathname + location.search);
-      FT.adoptDocument(copy, false);
-      FT.emit('hint', { text: 'Copied into your own tree — edit away.' });
-    },
-    // These two replace the whole document, so they take a checkpoint first —
-    // without it, losing a tree to a stray click would be unrecoverable.
-    reset: function () {
-      FT.checkpoint();
-      FT.adoptDocument(FT.newTree('Our Family'), false);
-      const p = FT.addPerson({ name: 'Me', x: 0, y: 0 });
+    /* A new tree never overwrites anything — that is the point of the shelf. */
+    newTree: function () {
       FT.save();
-      FT.select(p.id);
-      FT.fitToScreen();
-      FT.emit('hint', { text: 'Started a new tree.', undo: true });
+      FT.adoptDocument(FT.newTree('Untitled tree'));
+      titleInput.focus();
+      titleInput.select();
+      FT.emit('hint', { text: 'New tree. Add someone with "+ Person".' });
     },
-    demo: function () {
+    /* The sample replaces what is on the board, so it asks first when the board
+       has anything on it. */
+    demo: async function () {
+      if (Object.keys(FT.state.people).length) {
+        const yes = await FT.ask({
+          title: 'Replace this tree with the sample family?',
+          body: '“' + FT.state.title + '” has ' + Object.keys(FT.state.people).length +
+            ' people on the board. They will be replaced. You can undo it afterwards.',
+          confirmLabel: 'Replace',
+          danger: true,
+        });
+        if (!yes) return;
+      }
       FT.checkpoint();
       const demo = FT.demoTree();
+      demo.id = FT.state.id; // stay in the same tree on the shelf
       FT.silently(function () {
         FT.state = demo;
       });
       FT.autoArrange();
-      FT.adoptDocument(FT.state, false);
+      FT.adoptDocument(FT.state);
       FT.emit('hint', { text: 'Loaded the sample family.', undo: true });
     },
   };
@@ -233,8 +380,16 @@
   });
 
   importInput.addEventListener('change', function () {
-    if (importInput.files && importInput.files[0]) FT.importFile(importInput.files[0]);
+    const file = importInput.files && importInput.files[0];
     importInput.value = '';
+    if (!file) return;
+    // Imports open as their own tree rather than replacing the current one.
+    FT.importFile(file, function (doc) {
+      FT.save();
+      doc.id = FT.uid('t');
+      FT.adoptDocument(doc);
+      FT.emit('hint', { text: 'Imported “' + doc.title + '” as a new tree.' });
+    });
   });
 
   // ------------------------------------------------------------ keyboard
@@ -244,7 +399,7 @@
 
     if (e.key === 'Escape') {
       if (FT.isBookOpen()) FT.closeBook();
-      else if (!document.getElementById('shareDialog').hidden) FT.closeShare();
+      else if (!askDialog.hidden) closeAsk(false);
       else FT.select(null); // also clears any selected line
       return;
     }
@@ -257,7 +412,7 @@
       return;
     }
 
-    if (typing || FT.isBookOpen() || FT.readOnly) return;
+    if (typing || FT.isBookOpen()) return;
 
     if (e.key === 'Enter' && FT.selected) {
       e.preventDefault();
@@ -279,30 +434,19 @@
   // ------------------------------------------------------------- start up
 
   (async function boot() {
-    const shared = await FT.consumeShareLink();
-    if (shared === 'loaded') return;
+    FT.migrateLegacy(); // one-time move from the single-tree era
 
-    const saved = FT.loadLocal();
-    if (saved && Object.keys(saved.people).length) {
-      FT.adoptDocument(saved, false);
-    } else {
-      // First run: the sample family, already tidied, so there is something to poke at.
-      const demo = FT.demoTree();
-      FT.silently(function () {
-        FT.state = demo;
-      });
-      FT.autoArrange();
-      FT.adoptDocument(FT.state, false);
-      if (shared !== 'failed') {
-        FT.emit('hint', { text: 'Sample family loaded — drag a card, or open a book to read a life.' });
-      }
+    const saved = FT.pickStartupDoc();
+    if (saved) {
+      FT.adoptDocument(saved);
+      return;
     }
 
-    // Reported last so it is not buried by whatever we fell back to.
-    if (shared === 'failed') {
-      FT.emit('hint', {
-        text: 'That shared link could not be opened — it may be damaged or expired. Showing your own tree instead.',
-      });
-    }
+    // First visit: an empty board, not somebody else's family. The sample is a
+    // click away in the status bar for anyone who wants to look around first.
+    FT.adoptDocument(FT.newTree('Our Family'));
+    FT.emit('hint', {
+      text: 'Empty board — add someone with "+ Person", or load the sample family below.',
+    });
   })();
 })();

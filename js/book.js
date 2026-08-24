@@ -81,13 +81,7 @@
       : '<span class="initials">' + FT.escapeHtml(FT.initials(p.name)) + '</span>';
   }
 
-  function portraitHtml(p, ro) {
-    if (ro) {
-      return (
-        '<div class="portrait-wrap"><div class="portrait" data-gender="' +
-        FT.escapeHtml(p.gender) + '">' + portraitInner(p) + '</div></div>'
-      );
-    }
+  function portraitHtml(p) {
     return (
       '<div class="portrait-wrap">' +
         '<label class="portrait editable" data-gender="' + FT.escapeHtml(p.gender) +
@@ -106,17 +100,9 @@
   function renderLeft() {
     const p = person();
     if (!p) return;
-    const ro = FT.readOnly;
     const entries = sortedEntries(p);
 
     const field = function (label, key, value, placeholder) {
-      if (ro) {
-        if (!value) return '';
-        return (
-          '<div class="pf"><span class="pf-label">' + label + '</span>' +
-          '<span class="pf-value">' + FT.escapeHtml(value) + '</span></div>'
-        );
-      }
       return (
         '<label class="pf"><span class="pf-label">' + label + '</span>' +
         '<input class="pf-input" data-field="' + key + '" value="' +
@@ -131,15 +117,6 @@
     const dateField = function (label, key, value) {
       const iso = FT.isIsoDate(value) ? value : '';
       const legacy = !iso && value ? value : '';
-      if (ro) {
-        const shown = iso ? prettyDate(iso) : legacy;
-        if (!shown) return '';
-        return (
-          '<div class="pf"><span class="pf-label">' + label + '</span>' +
-          '<span class="pf-value">' + FT.escapeHtml(shown) + '</span></div>'
-        );
-      }
-
       const mode = dateModeFor(key, value);
       const toggle =
         mode === 'pick'
@@ -176,6 +153,20 @@
       );
     };
 
+    const genderField = function (value) {
+      const opts = [['f', 'Woman'], ['m', 'Man'], ['x', 'Unspecified']];
+      const cur = ['f', 'm', 'x'].indexOf(value) >= 0 ? value : 'x';
+      return (
+        '<div class="pf"><span class="pf-label">Gender</span>' +
+        '<select class="pf-input pf-select" data-field="gender" aria-label="Gender">' +
+          opts.map(function (o) {
+            return '<option value="' + o[0] + '"' +
+              (o[0] === cur ? ' selected' : '') + '>' + o[1] + '</option>';
+          }).join('') +
+        '</select></div>'
+      );
+    };
+
     /* Two lines, ellipsis past that, full text on hover. Editing swaps in a
        textarea on click (see openNoteEditor) — a clamped box cannot be typed in. */
     const clampField = function (label, key, value, placeholder) {
@@ -186,12 +177,10 @@
       // Hence the wrapper.
       return (
         '<div class="pf pf-tall"><span class="pf-label">' + label + '</span>' +
-        '<div class="pf-clampwrap' + (ro ? '' : ' editable') + (empty ? ' empty' : '') + '"' +
-          (ro ? '' : ' data-edit="' + key + '" tabindex="0" role="textbox"') +
+        '<div class="pf-clampwrap editable' + (empty ? ' empty' : '') + '"' +
+          ' data-edit="' + key + '" tabindex="0" role="textbox"' +
           ' data-full="' + FT.escapeHtml(text) + '">' +
-          '<span class="pf-clamp">' +
-            FT.escapeHtml(empty ? (ro ? '—' : placeholder) : text) +
-          '</span>' +
+          '<span class="pf-clamp">' + FT.escapeHtml(empty ? placeholder : text) + '</span>' +
         '</div></div>'
       );
     };
@@ -215,19 +204,18 @@
       : '<li class="toc-empty">No chapters yet.</li>';
 
     leftPage.innerHTML =
-      portraitHtml(p, ro) +
-      (ro
-        ? '<h2 class="person-name">' + FT.escapeHtml(p.name) + '</h2>'
-        : '<input class="person-name" data-field="name" value="' +
-          FT.escapeHtml(p.name) + '" placeholder="Name">') +
+      portraitHtml(p) +
+      '<input class="person-name" data-field="name" value="' +
+        FT.escapeHtml(p.name) + '" placeholder="Name">' +
       '<div class="person-fields">' +
         dateField('Born', 'birth', p.birth) +
         dateField('Died', 'death', p.death) +
         field('From', 'birthplace', p.birthplace, 'Place') +
+        genderField(p.gender) +
         clampField('Known for', 'knownFor', p.knownFor, 'A line or two about them') +
       '</div>' +
       '<div class="toc-head"><span>Chapters</span>' +
-        (ro ? '' : '<button class="mini-btn" id="addEntry">+ New chapter</button>') +
+        '<button class="mini-btn" id="addEntry">+ New chapter</button>' +
       '</div>' +
       '<ul class="toc">' + toc + '</ul>';
 
@@ -251,7 +239,7 @@
      carries data-field, so the existing input handler saves it as you type. */
   function openNoteEditor(clamp) {
     const p = person();
-    if (!p || FT.readOnly) return;
+    if (!p) return;
     const key = clamp.dataset.edit;
     const ta = document.createElement('textarea');
     ta.className = 'pf-input pf-multiline';
@@ -273,60 +261,48 @@
     const p = person();
     if (!p) return;
     const e = entry();
-    const ro = FT.readOnly;
 
     if (!e) {
       rightPage.innerHTML =
         '<div class="page-empty">' +
           '<div class="flourish">&#10086;</div>' +
           '<p>This book is unwritten.</p>' +
-          (ro
-            ? '<p class="muted">Nothing has been recorded for ' +
-              FT.escapeHtml(p.name) + ' yet.</p>'
-            : '<button class="mini-btn" id="addEntryEmpty">Write the first chapter</button>') +
+          '<button class="mini-btn" id="addEntryEmpty">Write the first chapter</button>' +
         '</div>';
       return;
     }
 
     // A chapter can cover a single day or a stretch of years, so the end date is
     // optional and only appears once asked for.
-    const dates = ro
-      ? '<div class="entry-date-ro">' + FT.escapeHtml(prettyRange(e)) + '</div>'
-      : '<div class="entry-dates">' +
-          '<input type="date" class="entry-date" value="' + FT.escapeHtml(e.date) + '"' +
-            (e.end ? ' max="' + FT.escapeHtml(e.end) + '"' : '') +
-            ' aria-label="Chapter start date">' +
-          (e.end
-            ? '<span class="date-dash">–</span>' +
-              '<input type="date" class="entry-end" value="' + FT.escapeHtml(e.end) + '"' +
-                (e.date ? ' min="' + FT.escapeHtml(e.date) + '"' : '') +
-                ' aria-label="Chapter end date">' +
-              '<button class="date-clear" id="clearEnd" title="Remove the end date" ' +
-                'aria-label="Remove the end date">&times;</button>'
-            : '<button class="date-add" id="addEnd">+ end date</button>') +
-        '</div>';
+    const dates =
+      '<div class="entry-dates">' +
+        '<input type="date" class="entry-date" value="' + FT.escapeHtml(e.date) + '"' +
+          (e.end ? ' max="' + FT.escapeHtml(e.end) + '"' : '') +
+          ' aria-label="Chapter start date">' +
+        (e.end
+          ? '<span class="date-dash">–</span>' +
+            '<input type="date" class="entry-end" value="' + FT.escapeHtml(e.end) + '"' +
+              (e.date ? ' min="' + FT.escapeHtml(e.date) + '"' : '') +
+              ' aria-label="Chapter end date">' +
+            '<button class="date-clear" id="clearEnd" title="Remove the end date" ' +
+              'aria-label="Remove the end date">&times;</button>'
+          : '<button class="date-add" id="addEnd">+ end date</button>') +
+      '</div>';
 
     rightPage.innerHTML =
       '<div class="entry-head">' +
         dates +
-        (ro
-          ? ''
-          : '<button class="mini-btn danger" id="deleteEntry" title="Delete this chapter">' +
-            'Delete</button>') +
+        '<button class="mini-btn danger" id="deleteEntry" title="Delete this chapter">' +
+          'Delete</button>' +
       '</div>' +
       '<div class="entry-warn" id="entryWarn" hidden></div>' +
-      (ro
-        ? '<h3 class="entry-title-ro">' +
-          FT.escapeHtml(e.title || 'Untitled chapter') + '</h3>'
-        : '<input class="entry-title" value="' + FT.escapeHtml(e.title) +
-          '" placeholder="Chapter title">') +
-      (ro
-        ? '<div class="entry-body-ro">' + FT.escapeHtml(e.body).replace(/\n/g, '<br>') + '</div>'
-        : '<textarea class="entry-body" placeholder="Write it down before it is lost…">' +
-          FT.escapeHtml(e.body) + '</textarea>') +
+      '<input class="entry-title" value="' + FT.escapeHtml(e.title) +
+        '" placeholder="Chapter title">' +
+      '<textarea class="entry-body" placeholder="Write it down before it is lost…">' +
+        FT.escapeHtml(e.body) + '</textarea>' +
       '<div class="entry-foot"><span id="wordCount"></span></div>';
 
-    if (!ro) autoGrow(rightPage.querySelector('.entry-body'));
+    autoGrow(rightPage.querySelector('.entry-body'));
     updateWordCount();
     checkDates();
 
@@ -398,7 +374,7 @@
 
   function addEntry() {
     const p = person();
-    if (!p || FT.readOnly) return;
+    if (!p) return;
     FT.checkpoint();
     const e = { id: FT.uid('e'), date: today(), end: '', title: '', body: '' };
     p.entries.push(e);
@@ -508,7 +484,6 @@
   });
 
   overlay.addEventListener('input', function (ev) {
-    if (FT.readOnly) return;
     const p = person();
     if (!p) return;
     const t = ev.target;
@@ -520,6 +495,10 @@
         // Only when they have no photo — this element is the <img> otherwise.
         const initials = leftPage.querySelector('.portrait .initials');
         if (initials) initials.textContent = FT.initials(t.value);
+      }
+      if (t.dataset.field === 'gender') {
+        const portrait = leftPage.querySelector('.portrait');
+        if (portrait) portrait.dataset.gender = t.value;
       }
       // A picked date replaces the old free-text value it was shown beside.
       if ((t.dataset.field === 'birth' || t.dataset.field === 'death') && t.value) {

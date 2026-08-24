@@ -29,6 +29,9 @@ module.exports = async function (t, h) {
   const FT = w.FT;
   const $ = (s) => d.querySelector(s);
   const $$ = (s) => Array.from(d.querySelectorAll(s));
+  d.querySelector('[data-action="demo"]').click();
+  await h.wait(200);
+
   const file = new w.File([new Uint8Array(buf)], 'gran.png', { type: 'image/png' });
   const josip = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Josip Kovač');
   const ana = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Ana Kovač');
@@ -100,29 +103,19 @@ module.exports = async function (t, h) {
   FT.redo();
   FT.closeBook();
 
-  t.section('sharing');
+  t.section('photos in an export');
   t.ok(FT.photoCount(FT.state) === 2, 'two photos in the tree');
-  await FT.openShare();
-  t.ok(!$('#photoToggleRow').hidden, 'the photo toggle appears');
-  t.ok(/KB/.test($('#photoCost').textContent), 'and states the cost (' + $('#photoCost').textContent + ')');
-  const withLink = $('#shareLink').value;
-  $('#includePhotos').checked = false;
-  $('#includePhotos').dispatchEvent(new w.Event('change', { bubbles: true }));
-  await h.wait(400);
-  t.ok($('#shareLink').value !== withLink, 'unchecking rebuilds the link');
-  t.ok(FT.photoCount(FT.state) === 2, 'and does not strip photos from my own tree');
+  const json = JSON.parse(JSON.stringify(FT.state));
+  t.ok(FT.photoCount(json) === 2, 'a JSON export carries them');
+  t.ok(/<image /.test(FT.buildSvg()), 'and an SVG export draws them');
 
-  const guest = await h.loadPage($('#shareLink').value);
-  t.ok(guest.window.FT.photoCount(guest.window.FT.state) === 0, 'the photo-free link carries no photos');
-  t.ok(guest.window.document.querySelectorAll('.card').length > 0, 'but the tree is all there');
-
-  t.section('hostile photo in a shared tree');
+  t.section('hostile photo in an imported file');
   const evil = FT.normalize({
     title: 'x',
     people: { e1: { name: 'A', photo: 'javascript:alert(1)' }, e2: { name: 'B', photo: 'https://evil.example/pixel.png' } },
     unions: {},
   });
   t.ok(evil.people.e1.photo === '' && evil.people.e2.photo === '', 'stripped on the way in');
-  FT.adoptDocument(evil, true);
+  FT.adoptDocument(evil);
   t.ok(d.querySelectorAll('#nodes img').length === 0, 'nothing is loaded or rendered');
 };

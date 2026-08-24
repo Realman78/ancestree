@@ -12,8 +12,6 @@
   FT.SIB_GAP = 40;     // horizontal gap between sibling subtrees
   FT.ROOT_GAP = 100;   // gap between unrelated root families
 
-  const KEY = 'heirloom.tree.v1';
-
   FT.uid = function (prefix) {
     return prefix + Math.random().toString(36).slice(2, 9);
   };
@@ -84,10 +82,10 @@
     );
   };
 
-  /* Photos arrive from shared links and imported files, so they are untrusted.
-     Only raster data: URLs are allowed through — this rejects `javascript:`,
-     remote URLs (which would phone home when a shared tree is opened), and SVG
-     (which can carry script). Anything else degrades to initials. */
+  /* Photos arrive from imported files, so they are untrusted. Only raster
+     data: URLs are allowed through — this rejects `javascript:`, remote URLs
+     (which would phone home when a tree is opened), and SVG (which can carry
+     script). Anything else degrades to initials. */
   const PHOTO_RE = /^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
   FT.MAX_PHOTO_BYTES = 3 * 1024 * 1024;
 
@@ -103,15 +101,6 @@
     return Object.keys(people).filter(function (id) {
       return people[id].photo;
     }).length;
-  };
-
-  /* A copy with the portraits dropped — used to keep a share link small. */
-  FT.withoutPhotos = function (doc) {
-    const copy = FT.clone(doc);
-    Object.keys(copy.people).forEach(function (id) {
-      copy.people[id].photo = '';
-    });
-    return copy;
   };
 
   FT.newUnion = function (attrs) {
@@ -131,7 +120,6 @@
   // --- the live document --------------------------------------------------
 
   FT.state = FT.newTree();
-  FT.readOnly = false;
 
   const undoStack = [];
   const redoStack = [];
@@ -152,7 +140,7 @@
   };
 
   FT.checkpoint = function (tag) {
-    if (suspended || FT.readOnly) return;
+    if (suspended) return;
     const top = undoStack[undoStack.length - 1];
     if (tag && top && top.tag === tag) return; // coalesce a run of same-kind edits
     undoStack.push({ tag: tag || null, snap: FT.clone(FT.state) });
@@ -206,32 +194,19 @@
   let storageWarned = false;
 
   FT.save = function () {
-    if (FT.readOnly) return;
     FT.state.updatedAt = Date.now();
-    try {
-      localStorage.setItem(KEY, JSON.stringify(FT.state));
+    const ok = FT.saveDoc(FT.state);
+    if (ok) {
       storageWarned = false;
-    } catch (e) {
-      // Usually the quota, now that photos are in the document. Say so once —
+    } else if (!storageWarned) {
+      // Usually the quota, now that photos live in the document. Say so once —
       // silently dropping saves would lose someone's writing.
-      if (!storageWarned) {
-        storageWarned = true;
-        FT.emit('hint', {
-          text:
-            'Out of browser storage — changes are no longer being saved here. ' +
-            'Use Export to keep this tree safe.',
-        });
-      }
-    }
-  };
-
-  FT.loadLocal = function () {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (!raw) return null;
-      return FT.normalize(JSON.parse(raw));
-    } catch (e) {
-      return null;
+      storageWarned = true;
+      FT.emit('hint', {
+        text:
+          'Out of browser storage — changes are no longer being saved here. ' +
+          'Use Export to keep this tree safe.',
+      });
     }
   };
 
@@ -362,7 +337,6 @@
     });
     const mate = FT.addPerson({
       name: 'Partner',
-      gender: anchor.gender === 'f' ? 'm' : anchor.gender === 'm' ? 'f' : 'x',
       x: anchor.x + FT.CARD_W + FT.SPOUSE_GAP,
       y: anchor.y,
     });
@@ -402,7 +376,6 @@
       const known = FT.state.people[u.partners[0]];
       const mate = FT.addPerson({
         name: 'Parent',
-        gender: known && known.gender === 'f' ? 'm' : known && known.gender === 'm' ? 'f' : 'x',
         x: (known ? known.x : anchor.x) + FT.CARD_W + FT.SPOUSE_GAP,
         y: known ? known.y : anchor.y - FT.ROW_H,
       });
@@ -445,8 +418,16 @@
   FT.dissolveUnion = function (unionId) {
     const u = FT.state.unions[unionId];
     if (!u) return false;
-    if (u.children.length && u.partners.length >= 2) u.partners = [u.partners[0]];
-    else delete FT.state.unions[unionId];
+    if (u.children.length && u.partners.length >= 2) {
+      // Keep whoever is drawn on the left, so the outcome matches what you see
+      // rather than the order the union happens to be stored in.
+      const keeper = u.partners
+        .slice()
+        .sort(function (a, b) {
+          return (FT.state.people[a].x || 0) - (FT.state.people[b].x || 0);
+        })[0];
+      u.partners = [keeper];
+    } else delete FT.state.unions[unionId];
     return true;
   };
 

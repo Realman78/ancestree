@@ -33,31 +33,26 @@ module.exports = async function (t, h) {
     await page.addStyleTag({
       content: '.book-overlay[hidden]{display:grid!important}.dialog-overlay[hidden]{display:grid!important}',
     });
-    const blocker = await topOf('[data-action="share"]');
-    t.ok(['#bookOverlay', '#shareDialog'].includes(blocker), 'without the fix, an invisible overlay (' + blocker + ') covers Share');
-    const wasOpen = await page.evaluate(() => !document.getElementById('shareDialog').hidden);
-    await page.click('[data-action="share"]', { timeout: 2000 }).catch(() => {});
+    const blocker = await topOf('#exportBtn');
+    t.ok(['#bookOverlay', '#askDialog'].includes(blocker), 'without the fix, an invisible overlay (' + blocker + ') covers the toolbar');
+    await page.click('#exportBtn', { timeout: 2000 }).catch(() => {});
     t.ok(
-      (await page.evaluate(() => !document.getElementById('shareDialog').hidden)) === wasOpen,
+      !(await page.locator('#exportMenu').isVisible()),
       'and the click does nothing — the reported freeze'
     );
 
     await page.reload({ waitUntil: 'networkidle' });
     await page.waitForTimeout(400);
-    t.ok((await topOf('[data-action="share"]')) !== '#bookOverlay', 'with the fix, nothing covers the toolbar');
-    for (const sel of ['#bookOverlay', '#shareDialog', '#pill', '#roBanner']) {
+    t.ok((await topOf('#exportBtn')) !== '#bookOverlay', 'with the fix, nothing covers the toolbar');
+    for (const sel of ['#bookOverlay', '#askDialog', '#pill', '#treeMenu', '#exportMenu']) {
       t.ok((await page.locator(sel).boundingBox()) === null, sel + ' occupies no space while hidden');
     }
 
-    t.section('toolbar');
-    await page.click('[data-action="share"]');
+    t.section('first visit and the sample');
+    t.ok((await page.locator('.card').count()) === 0, 'a first visit shows an empty board');
+    await page.click('[data-action="demo"]');
     await page.waitForTimeout(500);
-    t.ok(await page.locator('#shareDialog').isVisible(), 'Share opens the dialog');
-    t.ok((await page.inputValue('#shareLink')).startsWith('http'), 'and generates a link');
-    await page.click('#closeShare');
-    await page.waitForTimeout(300);
-    t.ok(!(await page.locator('#shareDialog').isVisible()), 'Done closes it');
-    t.ok((await topOf('[data-action="share"]')) !== '#shareDialog', 'and it stops blocking the page');
+    t.ok((await page.locator('.card').count()) === 9, 'the sample loads on request');
 
     const n0 = await page.locator('.card').count();
     await page.click('[data-action="add"]');
@@ -100,6 +95,8 @@ module.exports = async function (t, h) {
     });
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(600);
+    await page.click('[data-action="demo"]');
+    await page.waitForTimeout(500);
     await page.click('[data-action="arrange"]');
     await page.waitForTimeout(800);
 
@@ -147,7 +144,9 @@ module.exports = async function (t, h) {
       FT.selectEdge({ kind: 'partner', unionId: u.id, childId: null });
       window.__u = u.id;
       window.__kids = u.children.slice();
-      window.__keeper = u.partners[0];
+      // The keeper is the left-hand partner, matching what is drawn.
+      window.__keeper = u.partners.slice()
+        .sort(function (a, b) { return FT.state.people[a].x - FT.state.people[b].x; })[0];
     });
     await page.waitForTimeout(250);
 

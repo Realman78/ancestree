@@ -20,7 +20,25 @@
     <span>Heirloom</span>
   </div>
 
-  <input id="treeTitle" class="tree-title" aria-label="Family tree name" value="Our Family">
+  <div class="tree-id">
+    <input id="treeTitle" class="tree-title" aria-label="Family tree name" value="Our Family">
+    <button id="treeMenuBtn" class="btn tree-menu-btn" aria-haspopup="true" aria-expanded="false"
+            title="Your trees">
+      <span id="treeCount">1</span>
+      <svg viewBox="0 0 10 6" width="9" height="6" aria-hidden="true">
+        <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <div id="treeMenu" class="tree-menu" hidden>
+      <div class="tree-menu-head">Your trees</div>
+      <ul id="treeList" class="tree-list"></ul>
+      <div class="tree-menu-foot">
+        <button class="mini-btn" data-action="newTree">+ New tree</button>
+        <button class="mini-btn" data-action="import">Import JSON…</button>
+      </div>
+    </div>
+  </div>
 
   <div class="tools">
     <div class="tool-group edit-only">
@@ -59,17 +77,30 @@
       <button class="btn icon" data-action="zoomIn" title="Zoom in" aria-label="Zoom in">+</button>
     </div>
     <div class="tool-group">
-      <button class="btn" data-action="import" title="Open a .json family tree">Import</button>
-      <button class="btn" data-action="export" title="Download this tree as .json">Export</button>
-      <button class="btn primary" data-action="share">Share</button>
+      <button class="btn" data-action="import" title="Open a .json family tree as a new tree">Import</button>
+      <div class="menu-wrap">
+        <button id="exportBtn" class="btn primary" aria-haspopup="true" aria-expanded="false">
+          Export
+          <svg viewBox="0 0 10 6" width="9" height="6" aria-hidden="true">
+            <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div id="exportMenu" class="dropdown" hidden>
+          <button data-action="export">
+            <strong>JSON</strong><span>The whole tree, re-importable</span>
+          </button>
+          <button data-action="exportSvg">
+            <strong>SVG</strong><span>A vector drawing of the canvas</span>
+          </button>
+          <button data-action="exportPng">
+            <strong>PNG</strong><span>The same, as an image</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </header>
-
-<div id="roBanner" class="ro-banner" hidden>
-  <span>You are looking at a shared family tree. It is read-only.</span>
-  <button class="btn small" data-action="copyToMine">Make a copy I can edit</button>
-</div>
 
 <main id="stage" class="stage">
   <div id="viewport" class="viewport">
@@ -107,8 +138,7 @@
 <footer class="statusbar">
   <span class="legend"><i class="swatch f"></i>woman <i class="swatch m"></i>man <i class="swatch x"></i>unspecified</span>
   <span class="tips">Drag to move &middot; cards snap to the grid and to each other &middot; drop a photo on a card &middot; Ctrl+scroll to zoom</span>
-  <button class="btn small ghost" data-action="demo">Sample family</button>
-  <button class="btn small ghost edit-only" data-action="reset">Start fresh</button>
+  <button class="btn small ghost" data-action="demo">Load sample family</button>
 </footer>
 
 <!-- ---------------------------------------------------------------- book -->
@@ -121,24 +151,13 @@
   </div>
 </div>
 
-<!-- --------------------------------------------------------------- share -->
-<div id="shareDialog" class="dialog-overlay" hidden>
-  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
-    <h2 id="shareTitle">Share this family tree</h2>
-    <p class="dialog-sub">Anyone with the link can read the tree and every life book in it. They cannot change yours.</p>
-    <div class="link-row">
-      <input id="shareLink" class="link-box" readonly aria-label="Share link">
-      <button id="copyLink" class="btn primary">Copy link</button>
-    </div>
-    <label id="photoToggleRow" class="photo-toggle" hidden>
-      <input type="checkbox" id="includePhotos" checked>
-      <span>Include photos <span id="photoCost" class="photo-cost"></span></span>
-    </label>
-    <div id="shareSpinner" class="spinner" hidden></div>
-    <p id="shareNote" class="dialog-note"></p>
-    <div class="dialog-foot">
-      <button class="btn" data-action="export">Download a copy instead</button>
-      <button id="closeShare" class="btn ghost">Done</button>
+<div id="askDialog" class="dialog-overlay" hidden>
+  <div class="dialog dialog-narrow" role="alertdialog" aria-modal="true" aria-labelledby="askTitle">
+    <h2 id="askTitle"></h2>
+    <p id="askBody" class="dialog-sub"></p>
+    <div class="dialog-foot dialog-foot-right">
+      <button id="askCancel" class="btn ghost">Cancel</button>
+      <button id="askOk" class="btn primary">OK</button>
     </div>
   </div>
 </div>
@@ -146,11 +165,12 @@
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 
 <script src="js/state.js"></script>
+<script src="js/library.js"></script>
 <script src="js/photo.js"></script>
 <script src="js/layout.js"></script>
 <script src="js/tree.js"></script>
 <script src="js/book.js"></script>
-<script src="js/share.js"></script>
+<script src="js/exchange.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

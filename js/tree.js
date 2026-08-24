@@ -155,22 +155,10 @@
     );
   }
 
-  function drawEdges() {
-    const visible = [];
-    const hits = [];
-    const marks = [];
-    edgeMids = {};
-
-    const emit = function (kind, unionId, childId, d, extra) {
-      const attrs =
-        ' data-kind="' + kind + '" data-union="' + unionId + '"' +
-        (childId ? ' data-child="' + childId + '"' : '');
-      const cls =
-        'edge' + (extra ? ' ' + extra : '') +
-        (isEdgeSelected(kind, unionId, childId) ? ' selected' : '');
-      visible.push('<path class="' + cls + '"' + attrs + ' d="' + d + '"/>');
-      hits.push('<path class="edge-hit"' + attrs + ' d="' + d + '"/>');
-    };
+  /* The geometry of every relationship, shared by the canvas renderer and the
+     SVG export so a downloaded drawing matches what is on screen. */
+  FT.edgeGeometry = function () {
+    const out = [];
 
     FT.unionList().forEach(function (u) {
       const partners = u.partners
@@ -181,10 +169,12 @@
       if (!partners.length) return;
 
       let anchorX, anchorY;
+      let crossGen = false;
+
       if (partners.length >= 2) {
         const a = partners[0];
         const b = partners[1];
-        const crossGen = FT.isCrossGenerationUnion(u);
+        crossGen = FT.isCrossGenerationUnion(u);
         const midY = (a.y + b.y) / 2 + FT.CARD_H / 2;
         const leftP = a.x <= b.x ? a : b;
         const rightP = a.x <= b.x ? b : a;
@@ -193,9 +183,8 @@
         let d;
 
         if (crossGen) {
-          // These two are rows apart, so the usual squared-off bar would stride
-          // across whole generations and read as a mistake. A curve between the
-          // facing edges reads as the deliberate, unusual link it is.
+          // Rows apart: a squared-off bar would stride across whole generations
+          // and read as a mistake, so curve between the facing edges instead.
           const sx = x1;
           const sy = leftP.y + FT.CARD_H / 2;
           const ex = x2 > x1 ? x2 : rightP.x + FT.CARD_W;
@@ -203,8 +192,8 @@
           const bow = Math.max(70, Math.abs(ex - sx) / 2);
           d = 'M' + sx + ' ' + sy +
               'C' + (sx + bow) + ' ' + sy + ',' + (ex - bow) + ' ' + ey + ',' + ex + ' ' + ey;
-          // A cubic with horizontal handles passes exactly through the midpoint
-          // of its endpoints at t=0.5.
+          // A cubic with horizontal handles passes through the midpoint of its
+          // endpoints at t=0.5.
           anchorX = (sx + ex) / 2;
           anchorY = (sy + ey) / 2;
         } else if (x2 > x1) {
@@ -222,9 +211,11 @@
           anchorX = (a.x + b.x) / 2 + FT.CARD_W / 2;
           anchorY = midY;
         }
-        emit('partner', u.id, null, d, crossGen ? 'cross-gen' : '');
-        edgeMids[edgeKey('partner', u.id, null)] = { x: anchorX, y: anchorY };
-        marks.push({ x: anchorX, y: anchorY, crossGen: crossGen });
+
+        out.push({
+          kind: 'partner', unionId: u.id, childId: null, d: d, crossGen: crossGen,
+          mark: { x: anchorX, y: anchorY }, mid: { x: anchorX, y: anchorY },
+        });
       } else {
         anchorX = partners[0].x + FT.CARD_W / 2;
         anchorY = partners[0].y + FT.CARD_H;
@@ -242,10 +233,38 @@
 
       children.forEach(function (c) {
         const cx = c.x + FT.CARD_W / 2;
-        const d = 'M' + anchorX + ' ' + anchorY + 'V' + busY + 'H' + cx + 'V' + c.y;
-        emit('child', u.id, c.id, d, '');
-        edgeMids[edgeKey('child', u.id, c.id)] = { x: (anchorX + cx) / 2, y: busY };
+        out.push({
+          kind: 'child',
+          unionId: u.id,
+          childId: c.id,
+          crossGen: false,
+          mark: null,
+          d: 'M' + anchorX + ' ' + anchorY + 'V' + busY + 'H' + cx + 'V' + c.y,
+          mid: { x: (anchorX + cx) / 2, y: busY },
+        });
       });
+    });
+
+    return out;
+  };
+
+  function drawEdges() {
+    const visible = [];
+    const hits = [];
+    const marks = [];
+    edgeMids = {};
+
+    FT.edgeGeometry().forEach(function (e) {
+      const attrs =
+        ' data-kind="' + e.kind + '" data-union="' + e.unionId + '"' +
+        (e.childId ? ' data-child="' + e.childId + '"' : '');
+      const cls =
+        'edge' + (e.crossGen ? ' cross-gen' : '') +
+        (isEdgeSelected(e.kind, e.unionId, e.childId) ? ' selected' : '');
+      visible.push('<path class="' + cls + '"' + attrs + ' d="' + e.d + '"/>');
+      hits.push('<path class="edge-hit"' + attrs + ' d="' + e.d + '"/>');
+      edgeMids[edgeKey(e.kind, e.unionId, e.childId)] = e.mid;
+      if (e.mark) marks.push({ x: e.mark.x, y: e.mark.y, crossGen: e.crossGen });
     });
 
     const markSvg = marks.map(function (m) {
@@ -266,7 +285,7 @@
 
   function positionPill() {
     const p = FT.selected && FT.state.people[FT.selected];
-    if (!p || FT.readOnly) {
+    if (!p) {
       pill.hidden = true;
       return;
     }
@@ -281,7 +300,7 @@
   function positionEdgePill() {
     const s = FT.selectedEdge;
     const mid = s && edgeMids[edgeKey(s.kind, s.unionId, s.childId)];
-    if (!s || !mid || FT.readOnly) {
+    if (!s || !mid) {
       edgePill.hidden = true;
       return;
     }
@@ -382,7 +401,7 @@
   stage.addEventListener('pointerdown', function (e) {
     // A line is a relationship: clicking one selects it so it can be removed.
     const edgeEl = e.target.closest && e.target.closest('[data-kind]');
-    if (edgeEl && !FT.readOnly && !linkMode) {
+    if (edgeEl && !linkMode) {
       FT.selectEdge({
         kind: edgeEl.dataset.kind,
         unionId: edgeEl.dataset.union,
@@ -420,7 +439,6 @@
       }
 
       FT.select(id);
-      if (FT.readOnly) return;
 
       const p = FT.state.people[id];
       const start = screenToWorld(e.clientX, e.clientY);
@@ -541,7 +559,7 @@
   }
 
   stage.addEventListener('dragover', function (e) {
-    if (FT.readOnly || !draggingFiles(e)) return;
+    if (!draggingFiles(e)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     const el = e.target.closest ? e.target.closest('.card') : null;
@@ -553,7 +571,7 @@
   });
 
   stage.addEventListener('drop', function (e) {
-    if (FT.readOnly || !draggingFiles(e)) return;
+    if (!draggingFiles(e)) return;
     e.preventDefault();
     const el = e.target.closest ? e.target.closest('.card') : null;
     markDropTarget(null);

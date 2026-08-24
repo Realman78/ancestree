@@ -78,7 +78,8 @@ function loadHeadless() {
   return fresh.FT;
 }
 
-/* Load the real served page in jsdom. */
+/* Load the real served page in jsdom. Storage is per-jsdom-instance, so each
+   call starts from an empty shelf unless the test says otherwise. */
 async function loadPage(url, opts) {
   const { JSDOM } = require('jsdom');
   const options = opts || {};
