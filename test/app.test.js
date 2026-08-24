@@ -121,6 +121,63 @@ module.exports = async function (t, h) {
   t.ok(!!FT.parentUnionOf(someChild), 'undo restores a removed link');
   t.ok(w.__confirmCalls === 0, 'no dialog was used for any of it');
 
+  t.section('crossing lines hop over each other');
+  const hop = (edges) => edges.filter((e) => /A5 5/.test(e.d)).length;
+
+  // The sample family has no crossings, so nothing should be embellished.
+  FT.adoptDocument(FT.normalize(FT.demoTree()));
+  FT.autoArrange();
+  t.ok(hop(FT.edgeGeometry()) === 0, 'a tree with no crossings draws none');
+
+  // Three marriages force one connector under the row, where a child's riser
+  // from another union crosses it.
+  FT.adoptDocument(FT.newTree('Three marriages'));
+  const tid = {};
+  ['Josip', 'Ana', 'Marta', 'Vera', 'Ivan', 'Petar', 'Nina'].forEach((n) => {
+    tid[n] = FT.addPerson({ name: n, x: 0, y: 0 }).id;
+  });
+  [
+    [['Ana', 'Josip'], ['Ivan'], '1948'],
+    [['Josip', 'Marta'], ['Petar'], '1957'],
+    [['Josip', 'Vera'], ['Nina'], '1970'],
+  ].forEach(([pp, cc, dd]) => {
+    const un = FT.newUnion({
+      partners: pp.map((n) => tid[n]), children: cc.map((n) => tid[n]), date: dd,
+    });
+    FT.state.unions[un.id] = un;
+  });
+  FT.autoArrange();
+  const geo = FT.edgeGeometry();
+  t.ok(hop(geo) >= 1, 'a genuine crossing gets a hop (' + hop(geo) + ')');
+  t.ok(
+    geo.filter((e) => /A5 5/.test(e.d)).every((e) => e.kind === 'partner' || e.kind === 'child'),
+    'drawn on a real connector'
+  );
+
+  // Every hop must sit on a horizontal run, and only where two different
+  // unions actually cross — a shared junction is not a crossing.
+  const hopped = geo.find((e) => /A5 5/.test(e.d));
+  t.ok(!!hopped.pts, 'the hopped edge still has its route');
+  const arcs = (hopped.d.match(/A5 5/g) || []).length;
+  t.ok(arcs === 1, 'with one arc, not a stack of them');
+
+  // Children of one union share their route; they must never hop over each other.
+  FT.adoptDocument(FT.newTree('Siblings'));
+  const sid = {};
+  ['Ma', 'Pa', 'A', 'B', 'C'].forEach((n) => {
+    sid[n] = FT.addPerson({ name: n, x: 0, y: 0 }).id;
+  });
+  const su = FT.newUnion({
+    partners: [sid.Ma, sid.Pa], children: [sid.A, sid.B, sid.C],
+  });
+  FT.state.unions[su.id] = su;
+  FT.autoArrange();
+  t.ok(hop(FT.edgeGeometry()) === 0, 'siblings sharing one bus never hop over each other');
+
+  FT.adoptDocument(FT.normalize(FT.demoTree()));
+  FT.autoArrange();
+  FT.render();
+
   t.section('the book');
   const josip = Object.keys(FT.state.people).find((id) => FT.state.people[id].name === 'Josip Kovač');
   FT.openBook(josip);

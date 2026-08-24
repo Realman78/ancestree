@@ -17,6 +17,7 @@
   FT.selectedEdge = null;
   let linkMode = null; // 'partner' | 'child' — awaiting a second click
   let cards = {}; // id -> element
+  let renamingId = null; // a card whose name is being typed straight on the canvas
 
   // ---------------------------------------------------------------- viewport
 
@@ -82,10 +83,15 @@
       ? '<div class="avatar has-photo"><img src="' + p.photo + '" alt=""></div>'
       : '<div class="avatar"><span class="initials">' +
         FT.escapeHtml(FT.initials(p.name)) + '</span></div>';
+    const nameEl =
+      renamingId === p.id
+        ? '<input class="name name-edit" value="' + FT.escapeHtml(p.name) +
+          '" aria-label="Name" spellcheck="false">'
+        : '<div class="name">' + FT.escapeHtml(p.name) + '</div>';
     return (
       avatar +
       '<div class="meta">' +
-        '<div class="name">' + FT.escapeHtml(p.name) + '</div>' +
+        nameEl +
         (FT.bornAs(p)
           ? '<div class="born" title="' + FT.escapeHtml(FT.bornAs(p)) + '">' +
             FT.escapeHtml(FT.bornAs(p)) + '</div>'
@@ -122,6 +128,7 @@
       const sig = [
         p.name, p.birth, p.death, p.gender, p.birthSurname,
         p.photo.length, p.photo.slice(-24),
+        renamingId === p.id ? 'edit' : '',
       ].join('');
       if (el.dataset.sig !== sig) {
         el.innerHTML = cardHtml(p);
@@ -165,6 +172,94 @@
       !!s && s.kind === kind && s.unionId === unionId &&
       (s.childId || '') === (childId || '')
     );
+  }
+
+  /* Where two connectors cross, the one running horizontally arcs over the
+     other — the drafting convention, which reads as "these do not meet" without
+     needing a legend the way a second colour would.
+
+     Only genuine crossings count: segments belonging to one union share their
+     route by design, and two lines merely meeting end-to-end are a junction,
+     not a crossing. */
+  const HOP_R = 5;
+  const HOP_EPS = 1.5;
+
+  function addHops(edges) {
+    // Every pair of segments is compared, so stop before that gets expensive on
+    // a very large tree; the drawing is unreadable at that size regardless.
+    if (edges.length > 500) return;
+
+    const routes = edges.map(function (e) {
+      if (!e.pts) return null;
+      const segs = [];
+      for (let i = 0; i + 1 < e.pts.length; i++) segs.push([e.pts[i], e.pts[i + 1]]);
+      return segs;
+    });
+    const hops = edges.map(function () {
+      return {};
+    });
+
+    const isFlat = function (seg) {
+      return Math.abs(seg[0][1] - seg[1][1]) < 0.01;
+    };
+    const isUpright = function (seg) {
+      return Math.abs(seg[0][0] - seg[1][0]) < 0.01;
+    };
+
+    edges.forEach(function (a, i) {
+      if (!routes[i]) return;
+      routes[i].forEach(function (seg, si) {
+        if (!isFlat(seg)) return;
+        const y = seg[0][1];
+        const lo = Math.min(seg[0][0], seg[1][0]);
+        const hi = Math.max(seg[0][0], seg[1][0]);
+        edges.forEach(function (b, j) {
+          if (i === j || !routes[j] || a.unionId === b.unionId) return;
+          routes[j].forEach(function (other) {
+            if (!isUpright(other)) return;
+            const x = other[0][0];
+            const top = Math.min(other[0][1], other[1][1]);
+            const bot = Math.max(other[0][1], other[1][1]);
+            // Leave room for the arc, and ignore lines that only touch.
+            if (x <= lo + HOP_R + 1 || x >= hi - HOP_R - 1) return;
+            if (y <= top + HOP_EPS || y >= bot - HOP_EPS) return;
+            const list = (hops[i][si] = hops[i][si] || []);
+            if (!list.some(function (v) {
+              return Math.abs(v - x) < 2;
+            })) list.push(x);
+          });
+        });
+      });
+    });
+
+    edges.forEach(function (e, i) {
+      if (e.pts) e.d = routeToPath(e.pts, hops[i]);
+    });
+  }
+
+  function routeToPath(pts, hops) {
+    let d = 'M' + pts[0][0] + ' ' + pts[0][1];
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[i + 1];
+      const list = hops && hops[i];
+      if (list && list.length) {
+        const dir = b[0] > a[0] ? 1 : -1;
+        list
+          .slice()
+          .sort(function (p, q) {
+            return dir * (p - q);
+          })
+          .forEach(function (x) {
+            d += 'L' + (x - HOP_R * dir) + ' ' + a[1];
+            // Sweep chosen so the bump always rises, whichever way the line runs.
+            d += 'A' + HOP_R + ' ' + HOP_R + ' 0 0 ' + (dir > 0 ? 1 : 0) +
+              ' ' + (x + HOP_R * dir) + ' ' + a[1];
+          });
+      }
+      d += 'L' + b[0] + ' ' + b[1];
+    }
+    return d;
   }
 
   /* The geometry of every relationship, shared by the canvas renderer and the
@@ -215,6 +310,7 @@
       let anchorX, anchorY;
       let labelY = 0;
       let crossGen = false;
+      let pts = null;
 
       if (partners.length >= 2) {
         const a = partners[0];
@@ -243,9 +339,13 @@
           anchorY = (sy + ey) / 2;
           labelY = anchorY - 12;
         } else if (x2 > x1 && !blocked(leftP, rightP)) {
-          d = 'M' + x1 + ' ' + (leftP.y + CARD_H / 2) +
-              'H' + (x1 + x2) / 2 + 'V' + midY +
-              'H' + x2 + 'V' + (rightP.y + CARD_H / 2);
+          pts = [
+            [x1, leftP.y + CARD_H / 2],
+            [(x1 + x2) / 2, leftP.y + CARD_H / 2],
+            [(x1 + x2) / 2, midY],
+            [x2, midY],
+            [x2, rightP.y + CARD_H / 2],
+          ];
           anchorX = (a.x + b.x) / 2 + CARD_W / 2;
           anchorY = midY;
           // Beside the line there is only the gap between two cards, and the
@@ -258,16 +358,20 @@
           // visibly goes around rather than hiding behind.
           const underY =
             Math.max(a.y, b.y) + CARD_H + 26 + (depth[u.id] || 0) * 14;
-          d = 'M' + (leftP.x + CARD_W / 2) + ' ' + (leftP.y + CARD_H) +
-              'V' + underY +
-              'H' + (rightP.x + CARD_W / 2) + 'V' + (rightP.y + CARD_H);
+          pts = [
+            [leftP.x + CARD_W / 2, leftP.y + CARD_H],
+            [leftP.x + CARD_W / 2, underY],
+            [rightP.x + CARD_W / 2, underY],
+            [rightP.x + CARD_W / 2, rightP.y + CARD_H],
+          ];
           anchorX = (leftP.x + rightP.x) / 2 + CARD_W / 2;
           anchorY = underY;
           labelY = underY + 15;
         }
 
         out.push({
-          kind: 'partner', unionId: u.id, childId: null, d: d, crossGen: crossGen,
+          kind: 'partner', unionId: u.id, childId: null, d: d, pts: pts,
+          crossGen: crossGen,
           status: u.status, label: FT.unionLabel(u),
           labelPos: { x: anchorX, y: labelY },
           mark: { x: anchorX, y: anchorY }, mid: { x: anchorX, y: anchorY },
@@ -300,12 +404,13 @@
           status: u.status,
           label: '',
           mark: null,
-          d: 'M' + anchorX + ' ' + anchorY + 'V' + busY + 'H' + cx + 'V' + c.y,
+          pts: [[anchorX, anchorY], [anchorX, busY], [cx, busY], [cx, c.y]],
           mid: { x: (anchorX + cx) / 2, y: busY },
         });
       });
     });
 
+    addHops(out);
     return out;
   };
 
@@ -393,6 +498,69 @@
     edgePill.style.left = Math.round(r.left + view.x + mid.x * view.z) + 'px';
     edgePill.style.top = Math.round(r.top + view.y + mid.y * view.z - 14) + 'px';
   }
+
+  /* Name a card in place. New people arrive called "Child" or "New person", and
+     making that immediately typeable beats sending everyone into the book. */
+  FT.beginRename = function (id) {
+    if (!FT.state.people[id]) return;
+    renamingId = id;
+    FT.render();
+    const el = cards[id] && cards[id].querySelector('.name-edit');
+    if (!el) return;
+    el.focus();
+    el.select();
+  };
+
+  FT.endRename = function () {
+    if (!renamingId) return;
+    renamingId = null;
+    FT.render();
+  };
+
+  FT.isRenaming = function () {
+    return renamingId;
+  };
+
+  // Typing must not start a drag, and clicking into the field must not deselect.
+  nodes.addEventListener('pointerdown', function (e) {
+    if (e.target.classList && e.target.classList.contains('name-edit')) e.stopPropagation();
+  });
+
+  nodes.addEventListener('input', function (e) {
+    if (!e.target.classList || !e.target.classList.contains('name-edit')) return;
+    const p = FT.state.people[renamingId];
+    if (!p) return;
+    FT.checkpoint('rename:' + renamingId);
+    p.name = e.target.value;
+    // Update what depends on the name without rebuilding the field underneath it.
+    const card = cards[renamingId];
+    const initials = card && card.querySelector('.initials');
+    if (initials) initials.textContent = FT.initials(p.name);
+    FT.save();
+  });
+
+  nodes.addEventListener('keydown', function (e) {
+    if (!e.target.classList || !e.target.classList.contains('name-edit')) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      FT.endRename();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      FT.undo();
+      FT.endRename();
+    }
+    e.stopPropagation(); // Del and the single-key shortcuts are for the canvas
+  });
+
+  nodes.addEventListener('focusout', function (e) {
+    if (!e.target.classList || !e.target.classList.contains('name-edit')) return;
+    // Rebuilding the card inside the blur handler pulls the node out from under
+    // the browser mid-event, so let the event finish first.
+    setTimeout(function () {
+      const el = cards[renamingId] && cards[renamingId].querySelector('.name-edit');
+      if (!el || document.activeElement !== el) FT.endRename();
+    }, 0);
+  });
 
   FT.select = function (id) {
     FT.selected = id;

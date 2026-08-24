@@ -325,32 +325,45 @@
     add: function () {
       FT.checkpoint();
       const b = FT.contentBounds();
-      const p = FT.addPerson({ name: 'New person', x: b.x, y: b.y + b.h + FT.ROW_H / 2 });
+      const empty = !FT.peopleList().length;
+      const p = FT.addPerson({
+        name: 'New person',
+        x: empty ? 0 : b.x,
+        y: empty ? 0 : b.y + b.h + FT.ROW_H / 2,
+      });
       FT.save();
       FT.select(p.id);
-      FT.openBook(p.id);
+      FT.beginRename(p.id);
     },
     partner: function () {
       if (!FT.selected) return;
       FT.checkpoint();
       const mate = FT.addPartner(FT.selected);
       FT.save();
-      if (mate) FT.select(mate.id);
+      if (mate) {
+        FT.select(mate.id);
+        FT.beginRename(mate.id);
+      }
     },
     child: function () {
       if (!FT.selected) return;
       FT.checkpoint();
       const kid = FT.addChild(FT.selected);
       FT.save();
-      if (kid) FT.select(kid.id);
+      if (kid) {
+        FT.select(kid.id);
+        FT.beginRename(kid.id);
+      }
     },
     parent: function () {
       if (!FT.selected) return;
       FT.checkpoint();
       const par = FT.addParent(FT.selected);
       FT.save();
-      if (par) FT.select(par.id);
-      else FT.emit('hint', { text: 'This person already has two parents.' });
+      if (par) {
+        FT.select(par.id);
+        FT.beginRename(par.id);
+      } else FT.emit('hint', { text: 'This person already has two parents.' });
     },
     linkPartner: function () {
       FT.beginLink('partner');
@@ -541,6 +554,7 @@
       if (FT.isBookOpen()) FT.closeBook();
       else if (!askDialog.hidden) closeAsk(false);
       else if (!zoomMenu.hidden) openZoomMenu(false);
+      else if (FT.isRenaming()) FT.endRename();
       else FT.select(null); // also clears any selected line
       return;
     }

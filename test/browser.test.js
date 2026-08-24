@@ -58,10 +58,107 @@ module.exports = async function (t, h) {
     await page.click('[data-action="add"]');
     await page.waitForTimeout(400);
     t.ok((await page.locator('.card').count()) === n0 + 1, '"+ Person" adds a card');
-    t.ok(await page.locator('#bookOverlay').isVisible(), 'and opens their book');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+
+    await page.evaluate(() => {
+      FT.openBook(Object.keys(FT.state.people)[0]);
+    });
+    await page.waitForTimeout(400);
+    t.ok(await page.locator('#bookOverlay').isVisible(), 'a book can be opened');
     await page.keyboard.press('Escape');
     await page.waitForTimeout(400);
     t.ok(!(await page.locator('#bookOverlay').isVisible()), 'Escape closes the book');
+
+    t.section('a new person is named in place');
+    await page.evaluate(() => {
+      localStorage.clear();
+      location.reload();
+    });
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(600);
+
+    await page.click('[data-action="add"]');
+    await page.waitForTimeout(400);
+    t.ok(!(await page.locator('#bookOverlay').isVisible()),
+      'the book no longer opens over the canvas');
+    const field = page.locator('.card .name-edit');
+    t.ok(await field.isVisible(), 'the name becomes an input on the card');
+    t.ok(
+      await page.evaluate(() => document.activeElement.classList.contains('name-edit')),
+      'already focused');
+    t.ok(
+      await page.evaluate(() => {
+        const el = document.activeElement;
+        return el.selectionStart === 0 && el.selectionEnd === el.value.length;
+      }),
+      'with the placeholder name selected, so typing replaces it');
+
+    await page.keyboard.type('Ana Kovač');
+    await page.waitForTimeout(400);
+    t.ok(
+      await page.evaluate(() => FT.peopleList().some((p) => p.name === 'Ana Kovač')),
+      'typing renames the person as you go');
+    t.ok(
+      (await page.locator('.card .initials').first().textContent()) === 'AK',
+      'and the initials follow along');
+
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+    t.ok((await page.locator('.card .name-edit').count()) === 0, 'Enter finishes the edit');
+    t.ok((await page.locator('.card .name').first().textContent()) === 'Ana Kovač',
+      'leaving the name in place');
+
+    // Typing must not reach the canvas shortcuts.
+    await page.click('.card');
+    await page.waitForTimeout(200);
+    const before = await page.evaluate(() => FT.peopleList().length);
+    await page.click('#pill [data-action="child"]');
+    await page.waitForTimeout(400);
+    t.ok(await page.locator('.card .name-edit').isVisible(), '"+ Child" names the child in place too');
+    await page.keyboard.type('nnn');
+    await page.waitForTimeout(300);
+    t.ok(
+      await page.evaluate(() => FT.peopleList().length) === before + 1,
+      'the "n" shortcut does not fire while typing a name'
+    );
+    t.ok(
+      await page.evaluate(() => FT.peopleList().some((p) => p.name === 'nnn')),
+      'the characters land in the field'
+    );
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    t.ok((await page.locator('.card .name-edit').count()) === 0, 'Escape leaves the field');
+    t.ok(
+      await page.evaluate(() => !FT.peopleList().some((p) => p.name === 'nnn')),
+      'and puts the name back'
+    );
+
+    // Clicking away commits rather than losing the edit.
+    await page.evaluate(() => {
+      const id = Object.keys(FT.state.people)[0];
+      FT.select(id);
+      FT.beginRename(id);
+    });
+    await page.waitForTimeout(300);
+    await page.fill('.card .name-edit', 'Committed By Blur');
+    await page.click('#stage', { position: { x: 80, y: 420 } });
+    await page.waitForTimeout(400);
+    t.ok((await page.locator('.card .name-edit').count()) === 0, 'clicking away closes the field');
+    t.ok(
+      await page.evaluate(() => FT.peopleList().some((p) => p.name === 'Committed By Blur')),
+      'keeping what was typed'
+    );
+
+    await page.evaluate(() => {
+      localStorage.clear();
+      location.reload();
+    });
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(600);
+    await page.click('[data-action="demo"]');
+    await page.waitForTimeout(600);
 
     t.section('canvas');
     const card = page.locator('.card').first();

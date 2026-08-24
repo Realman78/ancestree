@@ -1256,3 +1256,19 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
 .edge-union .union-date { width: 62px; }
 .edge-union select:focus,
 .edge-union .union-date:focus { outline: none; border-color: var(--gold); background: #fff; }
+
+/* Naming a card in place, straight after it is created. */
+.name-edit {
+  display: block;
+  width: 100%;
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1.2;
+  color: var(--ink);
+  padding: 1px 4px;
+  margin: -1px -4px;
+  border: 1px solid var(--gold);
+  border-radius: 5px;
+  background: #fff;
+}
+.name-edit:focus { outline: none; box-shadow: 0 0 0 2px rgba(179,144,63,.25); }

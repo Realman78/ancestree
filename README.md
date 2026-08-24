@@ -35,6 +35,11 @@ Select a card to get its action bar: add a parent, partner or child, or use
 canvas. Links that would loop the tree (making someone their own ancestor) are
 refused.
 
+**A new person is named on the spot.** However they were added, their name
+becomes a field on the card with the placeholder selected, so you can just type.
+`Enter` finishes, `Esc` puts the old name back, clicking away keeps what you
+typed. The book is still a click away for everything else.
+
 **The lines are relationships, and you can click them.** A selected line
 highlights along its whole route and offers **Remove link**; `Del` does the same.
 Removing a partner line separates the couple — if they had children the union
@@ -64,6 +69,11 @@ unmarried partnership is dashed, and one that ended carries the genealogical
 double-slash. Relationships order chronologically, so remarriages read left to
 right. Nothing is drawn when no dates are recorded, so trees that do not track
 this stay clean.
+
+**Where two connectors cross**, the horizontal one arcs over the other — the
+drafting convention, which reads as "these do not meet" without needing a legend
+the way a second colour would. Lines belonging to the same union share their
+route by design and are left alone, as are junctions where lines genuinely meet.
 
 **Partners from different generations** — someone partnered with a descendant —
 are rare but real, and are drawn as a dashed curve instead of the usual squared
