@@ -74,7 +74,7 @@ module.exports = async function (t, h) {
   const LIMIT = 300;
   const fits = (lines) => lines.every((l) => widthOf(l) <= LIMIT + 0.5);
 
-  const runOn = FT.fitLines('marinparin'.repeat(14), F, LIMIT, 2);
+  const runOn = FT.fitLines('unbreakable'.repeat(14), F, LIMIT, 2);
   t.ok(runOn.length === 2, 'an unbroken 140-character word is split over both lines');
   t.ok(fits(runOn), 'and every line fits the width it was given');
   t.ok(runOn[1].endsWith('…'), 'with an ellipsis where it was cut');

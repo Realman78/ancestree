@@ -52,20 +52,11 @@
     return loose ? loose[1] : s;
   };
 
-  /* Relationship years are typed into small boxes, so keep them to digits and
-     a plausible range rather than accepting anything at all. Returns '' for
-     nothing usable, so a half-typed "19" simply reads as no date yet. */
-  FT.MIN_YEAR = 1;
-  FT.MAX_YEAR = 2999;
-
+  /* Relationship years are typed into small boxes, so keep them to digits.
+     A half-typed "19" is left alone — it simply reads as no date yet. */
   FT.cleanYear = function (v) {
     const digits = String(v == null ? '' : v).replace(/[^0-9]/g, '').slice(0, 4);
     return digits;
-  };
-
-  FT.isUsableYear = function (v) {
-    const n = Number(v);
-    return /^[0-9]{3,4}$/.test(String(v)) && n >= FT.MIN_YEAR && n <= FT.MAX_YEAR;
   };
 
   /* "14 March 1921". Free text is passed through untouched. */

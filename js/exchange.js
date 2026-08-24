@@ -175,7 +175,9 @@
 
   // ------------------------------------------------ every tree in one file
 
-  const ARCHIVE_KIND = 'heirloom-archive';
+  const ARCHIVE_KIND = 'ancestree-archive';
+  // Backups written before the rename carry the old marker; still read them.
+  const ARCHIVE_KINDS = [ARCHIVE_KIND, 'heirloom-archive'];
 
   /* One file holding the whole shelf. The account-free equivalent of a backup:
      keep it somewhere safe and any browser can be restored from it. */
@@ -193,7 +195,7 @@
       new Blob([JSON.stringify({ kind: ARCHIVE_KIND, version: 1, trees: trees }, null, 2)], {
         type: 'application/json',
       }),
-      'heirloom-backup-' + new Date().toISOString().slice(0, 10) + '.json'
+      'ancestree-backup-' + new Date().toISOString().slice(0, 10) + '.json'
     );
     return true;
   };
@@ -201,7 +203,7 @@
   /* Accepts either an archive or a single tree, so one Import can take both. */
   FT.readTrees = function (text) {
     const raw = JSON.parse(text);
-    if (raw && raw.kind === ARCHIVE_KIND && Array.isArray(raw.trees)) {
+    if (raw && ARCHIVE_KINDS.indexOf(raw.kind) >= 0 && Array.isArray(raw.trees)) {
       return raw.trees.map(FT.normalize).filter(function (doc) {
         return Object.keys(doc.people).length;
       });

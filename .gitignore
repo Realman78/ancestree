@@ -1,10 +1,8 @@
-# Share snapshots written by server.js — these are people's family data, not code.
-shares/
-
 node_modules/
 *.log
 .DS_Store
 
-# Personal tree exports kept in the working directory
+# Family trees exported into the working directory while testing.
+# Real people's data has no place in this repository.
 temp
 *.tree.json

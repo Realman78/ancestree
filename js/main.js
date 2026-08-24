@@ -146,7 +146,6 @@
       zoomInput.select();
     }
   }
-  FT.openZoomMenu = openZoomMenu;
 
   zoomLevel.addEventListener('click', function (e) {
     e.stopPropagation();
@@ -250,7 +249,6 @@
           .join('')
       : '<li class="tree-empty">No saved trees yet.</li>';
   }
-  FT.renderTreeList = renderTreeList;
 
   const storageUse = document.getElementById('storageUse');
 
@@ -478,6 +476,11 @@
     },
     import: function () {
       importInput.click();
+    },
+    backupAll: function () {
+      if (FT.exportAll()) {
+        FT.emit('hint', { text: 'Backed up every tree into one file.' });
+      }
     },
     /* A new tree never overwrites anything — that is the point of the shelf. */
     newTree: function () {

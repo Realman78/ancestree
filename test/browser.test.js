@@ -604,13 +604,13 @@ module.exports = async function (t, h) {
         return p;
       };
       const a = mk({
-        name: 'Marin Parin',
+        name: 'Marina Parkin',
         x: 0, y: 0,
         birth: '1921-03-14', death: '1998-11-02',
         birthplace: 'Cedar Falls',
         birthSurname: 'Fairweather-Calloway',
         // exactly what broke it: one word with no spaces at all
-        knownFor: 'marinparin'.repeat(14),
+        knownFor: 'unbreakable'.repeat(14),
       });
       const b = mk({
         name: 'Bartholomew Maximilian Fitzwilliam-Fairweather the Third',
@@ -644,7 +644,7 @@ module.exports = async function (t, h) {
             worst.over = over;
             worst.text = t.textContent.slice(0, 40);
           }
-          if (/^marinparin/.test(t.textContent) && t.textContent.length < 120) brokenWord = true;
+          if (/^unbreakable/.test(t.textContent) && t.textContent.length < 120) brokenWord = true;
           boxes.push({ bb, text: t.textContent });
         });
         // A label landing on its own value, or a row on the section below it,

@@ -75,6 +75,30 @@ module.exports = async function (t, h) {
   t.ok(!$('#fileStatus'), 'there is no "this tree on disk" panel');
   t.ok(!!$('[data-action="backupAll"]'), 'but backing every tree up is still offered');
 
+  t.section('backing up every tree');
+  // This button lost its action once and nobody noticed, because nothing
+  // checked that clicking it actually produced anything.
+  let backedUp = null;
+  const realCreate = w.URL.createObjectURL;
+  w.URL.createObjectURL = function (blob) {
+    backedUp = blob;
+    return 'blob:stub';
+  };
+  $('[data-action="backupAll"]').click();
+  await h.wait(150);
+  w.URL.createObjectURL = realCreate;
+  t.ok(!!backedUp, 'the button produces a file');
+  t.ok(backedUp && backedUp.type === 'application/json', 'as JSON');
+  const text = await new Promise((res) => {
+    const r = new w.FileReader();
+    r.onload = () => res(r.result);
+    r.readAsText(backedUp);
+  });
+  const restored = FT.readTrees(text);
+  t.ok(restored.length === FT.listDocs().length,
+    'holding every tree on the shelf (' + restored.length + ')');
+  t.ok(restored.some((d) => Object.keys(d.people).length === 9), 'with their people intact');
+
   t.section('the shelf survives a reload');
   const again = await h.loadPage();
   t.ok(again.window.FT.listDocs().length >= 0, 'a fresh browser profile starts with its own shelf');
