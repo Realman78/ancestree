@@ -69,9 +69,69 @@
   });
   FT.ask = ask;
 
+  /* An input scrolled to its end shows the tail of a long name. Reset the
+     scroll and carry the whole thing as a tooltip. */
+  function showTitle(value) {
+    titleInput.value = value;
+    titleInput.title = value;
+    titleInput.scrollLeft = 0;
+    titleInput.setSelectionRange(0, 0);
+  }
+
   const zoomLevel = document.getElementById('zoomLevel');
+  const zoomMenu = document.getElementById('zoomMenu');
+  const zoomInput = document.getElementById('zoomInput');
+
   FT.on('zoom', function (payload) {
-    zoomLevel.textContent = Math.round(payload.z * 100) + '%';
+    const pct = Math.round(payload.z * 100);
+    zoomLevel.textContent = pct + '%';
+    // Do not fight the user while they are typing into it.
+    if (zoomMenu.hidden || document.activeElement !== zoomInput) zoomInput.value = pct;
+  });
+
+  function openZoomMenu(open) {
+    zoomMenu.hidden = !open;
+    zoomLevel.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      zoomInput.value = Math.round(FT.zoomLevel() * 100);
+      zoomInput.focus();
+      zoomInput.select();
+    }
+  }
+  FT.openZoomMenu = openZoomMenu;
+
+  zoomLevel.addEventListener('click', function (e) {
+    e.stopPropagation();
+    openZoomMenu(zoomMenu.hidden);
+  });
+
+  function applyTypedZoom() {
+    const pct = Number(zoomInput.value);
+    if (!Number.isFinite(pct) || pct <= 0) {
+      zoomInput.value = Math.round(FT.zoomLevel() * 100);
+      return;
+    }
+    // zoomTo clamps; reflect what was actually applied rather than what was typed.
+    FT.zoomTo(pct / 100);
+    const applied = Math.round(FT.zoomLevel() * 100);
+    zoomInput.value = applied;
+    if (applied !== Math.round(pct)) {
+      FT.emit('hint', { text: 'Zoom is limited to between 25% and 250%.' });
+    }
+  }
+
+  document.getElementById('zoomForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    applyTypedZoom();
+    openZoomMenu(false);
+  });
+
+  zoomMenu.addEventListener('click', function (e) {
+    const preset = e.target.closest('[data-zoom]');
+    if (!preset) return;
+    if (preset.dataset.zoom === 'fit') FT.fitToScreen();
+    else FT.zoomTo(Number(preset.dataset.zoom) / 100);
+    openZoomMenu(false);
   });
 
   function syncHistory() {
@@ -83,7 +143,7 @@
   FT.on('change', function () {
     FT.resetCards();
     FT.render();
-    titleInput.value = FT.state.title;
+    showTitle(FT.state.title);
     FT.save();
   });
 
@@ -94,7 +154,7 @@
       FT.selected = null;
       FT.selectedEdge = null;
     });
-    titleInput.value = FT.state.title;
+    showTitle(FT.state.title);
     FT.resetCards();
     FT.render();
     FT.fitToScreen();
@@ -203,6 +263,7 @@
   });
 
   document.addEventListener('click', function (e) {
+    if (!zoomMenu.hidden && !e.target.closest('.menu-wrap')) openZoomMenu(false);
     if (!treeMenu.hidden && !e.target.closest('.tree-id')) openTreeMenu(false);
     const exportMenu = document.getElementById('exportMenu');
     if (!exportMenu.hidden && !e.target.closest('.menu-wrap')) exportMenu.hidden = true;
@@ -332,9 +393,6 @@
     fit: function () {
       FT.fitToScreen();
     },
-    zoomReset: function () {
-      FT.zoomTo(1);
-    },
     zoomIn: function () {
       FT.zoomBy(1.2);
     },
@@ -403,7 +461,13 @@
   titleInput.addEventListener('input', function () {
     FT.checkpoint('title');
     FT.state.title = titleInput.value;
+    titleInput.title = titleInput.value;
     FT.save();
+  });
+
+  // Typing scrolls to the caret; on blur, show the beginning again.
+  titleInput.addEventListener('blur', function () {
+    titleInput.scrollLeft = 0;
   });
 
   importInput.addEventListener('change', function () {
@@ -434,6 +498,7 @@
     if (e.key === 'Escape') {
       if (FT.isBookOpen()) FT.closeBook();
       else if (!askDialog.hidden) closeAsk(false);
+      else if (!zoomMenu.hidden) openZoomMenu(false);
       else FT.select(null); // also clears any selected line
       return;
     }

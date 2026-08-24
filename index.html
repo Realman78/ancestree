@@ -71,8 +71,29 @@
     </div>
     <div class="tool-group">
       <button class="btn icon" data-action="zoomOut" title="Zoom out" aria-label="Zoom out">&minus;</button>
-      <button class="btn zoom-level" id="zoomLevel" data-action="zoomReset"
-              title="Reset to 100%">100%</button>
+      <div class="menu-wrap">
+        <button class="btn zoom-level" id="zoomLevel" aria-haspopup="true"
+                aria-expanded="false" title="Set the zoom">100%</button>
+        <div id="zoomMenu" class="dropdown zoom-menu" hidden>
+          <form id="zoomForm" class="zoom-form" novalidate>
+            <label for="zoomInput">Zoom to</label>
+            <span class="zoom-input-wrap">
+              <input id="zoomInput" type="number" min="25" max="250" step="1"
+                     inputmode="numeric" aria-label="Zoom percentage">
+              <span class="zoom-pct">%</span>
+            </span>
+            <button type="submit" class="mini-btn">Set</button>
+          </form>
+          <div class="zoom-presets">
+            <button data-zoom="50">50%</button>
+            <button data-zoom="75">75%</button>
+            <button data-zoom="100">100%</button>
+            <button data-zoom="150">150%</button>
+            <button data-zoom="200">200%</button>
+            <button data-zoom="fit">Fit</button>
+          </div>
+        </div>
+      </div>
       <button class="btn icon" data-action="fit" title="Fit to screen (F)" aria-label="Fit to screen">
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
           <path d="M2 5.5V2.5h3.5M14 5.5V2.5h-3.5M2 10.5v3h3.5M14 10.5v3h-3.5"
@@ -92,7 +113,7 @@
                   stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
-        <div id="exportMenu" class="dropdown" hidden>
+        <div id="exportMenu" class="dropdown menu-list" hidden>
           <button data-action="export">
             <strong>JSON</strong><span>The whole tree, re-importable</span>
           </button>

@@ -101,34 +101,112 @@
 
   const esc = FT.escapeHtml;
 
-  /* Wrap to at most `maxLines`, ellipsing what will not fit. Measured by
-     character count rather than text metrics — good enough for a drawing, and
-     it keeps the export synchronous and dependency-free. */
-  function wrapText(text, maxChars, maxLines) {
-    const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  /* Fitting text into a card.
+
+     This used to count characters, which is wrong twice over: character width
+     varies with the glyph, and a word with no spaces in it was never broken at
+     all. A single long word therefore rendered as one enormous line that ran
+     clean out of its card and across the neighbouring one.
+
+     So measure. The canvas gives real pixel widths for the same font the SVG
+     will ask for, long words are hard-broken, and the result is ellipsed to fit
+     the space that actually exists. */
+  let measureCtx;
+
+  function widthOf(text, font) {
+    if (measureCtx === undefined) {
+      try {
+        measureCtx = document.createElement('canvas').getContext('2d');
+      } catch (e) {
+        measureCtx = null;
+      }
+    }
+    if (!measureCtx) return String(text).length * 7; // crude, but never used in a browser
+    measureCtx.font = font;
+    return measureCtx.measureText(String(text)).width;
+  }
+
+  /* Put an ellipsis on a line, trimming until the whole thing fits. */
+  function withEllipsis(line, font, maxWidth) {
+    let t = String(line);
+    while (t && widthOf(t.replace(/\s+$/, '') + '…', font) > maxWidth) t = t.slice(0, -1);
+    return t.replace(/\s+$/, '') + '…';
+  }
+
+  /* Break one word that is too wide to sit on a line of its own. */
+  function breakWord(word, font, maxWidth) {
+    const pieces = [];
+    let rest = word;
+    while (rest && widthOf(rest, font) > maxWidth) {
+      let lo = 1;
+      let hi = rest.length;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        if (widthOf(rest.slice(0, mid), font) <= maxWidth) lo = mid;
+        else hi = mid - 1;
+      }
+      pieces.push(rest.slice(0, lo));
+      rest = rest.slice(lo);
+    }
+    if (rest) pieces.push(rest);
+    return pieces;
+  }
+
+  function fitLines(text, font, maxWidth, maxLines) {
+    const words = String(text == null ? '' : text).trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+
     const lines = [];
     let line = '';
-    words.forEach(function (w) {
+    let truncated = false;
+
+    for (let i = 0; i < words.length && !truncated; i++) {
+      const w = words[i];
       const next = line ? line + ' ' + w : w;
-      if (next.length > maxChars && line) {
-        lines.push(line);
-        line = w;
-      } else {
+      if (widthOf(next, font) <= maxWidth) {
         line = next;
+        continue;
       }
-    });
-    if (line) lines.push(line);
+      if (line) {
+        lines.push(line);
+        line = '';
+      }
+      if (lines.length >= maxLines) {
+        truncated = true;
+        break;
+      }
+      if (widthOf(w, font) <= maxWidth) {
+        line = w;
+        continue;
+      }
+      // Too wide even alone — split it across lines rather than let it run.
+      const pieces = breakWord(w, font, maxWidth);
+      for (let k = 0; k < pieces.length - 1 && !truncated; k++) {
+        lines.push(pieces[k]);
+        if (lines.length >= maxLines) truncated = true;
+      }
+      if (!truncated) line = pieces[pieces.length - 1];
+    }
+
+    if (!truncated && line) lines.push(line);
     if (lines.length > maxLines) {
       lines.length = maxLines;
-      const last = lines[maxLines - 1];
-      lines[maxLines - 1] = last.slice(0, Math.max(0, maxChars - 1)).replace(/\s+$/, '') + '…';
+      truncated = true;
+    }
+    // Say so when something was dropped, rather than stopping mid-sentence.
+    if (truncated && lines.length) {
+      lines[lines.length - 1] = withEllipsis(lines[lines.length - 1], font, maxWidth);
     }
     return lines;
   }
 
-  function wrapName(name, maxChars) {
-    return wrapText(name, maxChars, 2);
-  }
+  FT.fitLines = fitLines; // exercised directly by the tests
+
+  const SERIF = 'Georgia, serif';
+  const SANS = 'Helvetica, Arial, sans-serif';
+  const font = function (size, family) {
+    return size + 'px ' + family;
+  };
 
   const TINT = { f: '#b07f9a', m: '#6f8aa8', x: '#7c8a6c' };
   const AVATAR = { f: '#8d5c78', m: '#4f6c8a', x: '#7d4e32' };
@@ -199,7 +277,7 @@
         );
       }
 
-      const lines = wrapName(p.name, 17);
+      const lines = fitLines(p.name, font(15, SERIF), FT.CARD_W - 64 - 12, 2);
       const span = FT.lifespan(p);
       const top = lines.length > 1 ? 40 : 47;
       lines.forEach(function (line, i) {
@@ -284,10 +362,19 @@
   function detailCard(p) {
     const g = TINT[p.gender] ? p.gender : 'x';
     const out = [];
+    const clipId = 'dcard-' + p.id;
 
+    // Text is measured to fit, but the font that renders this file elsewhere may
+    // have slightly different metrics. Clip to the card so a few stray pixels
+    // can never become text sprawling across the neighbouring one.
+    out.push(
+      '<clipPath id="' + clipId + '"><rect width="' + D.w + '" height="' + D.h +
+        '" rx="16"/></clipPath>'
+    );
+    out.push('<g clip-path="url(#' + clipId + ')">');
     out.push(
       '<rect width="' + D.w + '" height="' + D.h + '" rx="16" ' +
-        'fill="#fffdf8" stroke="#d8cbb4" stroke-width="1.25"/>'
+        'fill="#fffdf8"/>'
     );
     out.push('<rect x="0" y="18" width="4" height="' + (D.h - 36) +
       '" rx="2" fill="' + TINT[g] + '"/>');
@@ -327,7 +414,7 @@
     }
 
     // Name, over two lines if it needs them, then the lifespan in years.
-    const nameLines = wrapText(p.name, 19, 2);
+    const nameLines = fitLines(p.name, font(20, SERIF), D.w - D.textX - 20, 2);
     let y = nameLines.length > 1 ? 52 : 60;
     nameLines.forEach(function (line, i) {
       out.push(
@@ -364,7 +451,7 @@
       out.push(
         '<text x="76" y="' + ry + '" font-family="Helvetica, Arial, sans-serif" ' +
           'font-size="12.5" fill="#3b332a">' +
-          esc(wrapText(row[1], 30, 1)[0] || '') + '</text>'
+          esc(fitLines(row[1], font(12.5, SANS), D.w - 76 - 20, 1)[0] || '') + '</text>'
       );
       ry += 21;
     });
@@ -377,7 +464,7 @@
         '<text x="20" y="200" font-family="Georgia, serif" font-size="9.5" ' +
           'letter-spacing="0.13em" fill="#9a9084">KNOWN FOR</text>'
       );
-      wrapText(p.knownFor, 40, 2).forEach(function (line, i) {
+      fitLines(p.knownFor, font(12.5, SERIF), D.w - 40, 2).forEach(function (line, i) {
         out.push(
           '<text x="20" y="' + (217 + i * 16) + '" font-family="Georgia, serif" ' +
             'font-size="12.5" fill="#3b332a">' + esc(line) + '</text>'
@@ -385,6 +472,12 @@
       });
     }
 
+    out.push('</g>');
+    // Border last and outside the clip, so it stays a clean unclipped outline.
+    out.push(
+      '<rect width="' + D.w + '" height="' + D.h + '" rx="16" ' +
+        'fill="none" stroke="#d8cbb4" stroke-width="1.25"/>'
+    );
     return out.join('');
   }
 
@@ -428,8 +521,8 @@
 
     FT.peopleList().forEach(function (p) {
       const pos = layout.people[p.id];
-      out.push('<g transform="translate(' + pos.x + ',' + pos.y + ')">' +
-        detailCard(p) + '</g>');
+      out.push('<g data-person="' + esc(p.id) + '" transform="translate(' +
+        pos.x + ',' + pos.y + ')">' + detailCard(p) + '</g>');
     });
 
     out.push('</g>');

@@ -50,6 +50,39 @@ module.exports = async function (t, h) {
   t.ok(/href="data:image\/png;base64,/.test(photoSvg), 'embedded inline, so the file stands alone');
   t.ok(/clip-path="url\(#clip-/.test(photoSvg), 'clipped to the portrait circle');
 
+  t.section('fitting text into a fixed width');
+  // Character counting was the original bug: it cannot know real glyph widths,
+  // and it never broke a word that had no spaces in it.
+  const F = '12.5px Georgia, serif';
+  const widthOf = (str) => {
+    const c = d.createElement('canvas').getContext('2d');
+    c.font = F;
+    return c.measureText(str).width;
+  };
+  const LIMIT = 300;
+  const fits = (lines) => lines.every((l) => widthOf(l) <= LIMIT + 0.5);
+
+  const runOn = FT.fitLines('marinparin'.repeat(14), F, LIMIT, 2);
+  t.ok(runOn.length === 2, 'an unbroken 140-character word is split over both lines');
+  t.ok(fits(runOn), 'and every line fits the width it was given');
+  t.ok(runOn[1].endsWith('…'), 'with an ellipsis where it was cut');
+
+  const prose = FT.fitLines(
+    'Kept the village school open through two hard winters and then rebuilt ' +
+      'the roof herself, twice, without ever once asking for help.', F, LIMIT, 2);
+  t.ok(prose.length === 2 && fits(prose), 'ordinary prose wraps within the width');
+  t.ok(prose[1].endsWith('…'), 'and is marked when it overflows two lines');
+
+  const short = FT.fitLines('Village blacksmith', F, LIMIT, 2);
+  t.ok(short.length === 1 && !short[0].endsWith('…'), 'text that fits is left alone');
+  t.ok(FT.fitLines('', F, LIMIT, 2).length === 0, 'empty text yields no lines');
+  t.ok(FT.fitLines('   ', F, LIMIT, 2).length === 0, 'whitespace yields no lines');
+
+  const oneLine = FT.fitLines('A Very Long Place Name In The Middle Of Nowhere, Croatia',
+    F, LIMIT, 1);
+  t.ok(oneLine.length === 1 && fits(oneLine), 'a single-line field is held to one line');
+  t.ok(oneLine[0].endsWith('…'), 'and ellipsed');
+
   t.section('the detailed SVG');
   // Give the sample enough detail that every part of the card is exercised.
   // An earlier section renamed the first person to test escaping; put it back
@@ -63,8 +96,10 @@ module.exports = async function (t, h) {
 
   const dParsed = new w.DOMParser().parseFromString(detail, 'image/svg+xml');
   t.ok(!dParsed.querySelector('parsererror'), 'parses as well-formed XML');
-  t.ok((detail.match(/<rect [^>]*rx="16"/g) || []).length === people.length,
+  t.ok((detail.match(/<g clip-path="url\(#dcard-/g) || []).length === people.length,
     'one detailed card per person');
+  t.ok((detail.match(/<clipPath id="dcard-/g) || []).length === people.length,
+    'each clipped to its own bounds so text cannot escape it');
 
   t.ok(/BORN/.test(detail) && /DIED/.test(detail), 'has Born and Died labels');
   t.ok(/14 March 1921/.test(detail), 'dates carry the day and month, not just the year');

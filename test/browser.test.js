@@ -222,6 +222,27 @@ module.exports = async function (t, h) {
       'and the tree keeps its generations instead of running off the canvas'
     );
 
+    t.section('a long tree name');
+    const LONG = 'The Extended Kovačević Family of Sinj and the Dalmatian Hinterland, 1840 onwards';
+    await page.fill('#treeTitle', LONG);
+    await page.click('#stage', { position: { x: 60, y: 300 } });
+    await page.waitForTimeout(400);
+    const title = await page.evaluate(() => {
+      const i = document.getElementById('treeTitle');
+      return {
+        scrollLeft: i.scrollLeft,
+        overflowing: i.scrollWidth > i.clientWidth,
+        tooltip: i.title,
+        ellipsis: getComputedStyle(i).textOverflow,
+      };
+    });
+    t.ok(title.overflowing, 'the name is too long for its box');
+    t.ok(title.scrollLeft === 0, 'the beginning is shown, not the end');
+    t.ok(title.ellipsis === 'ellipsis', 'the tail is ellipsed');
+    t.ok(title.tooltip === LONG, 'and hovering gives the whole name');
+    await page.fill('#treeTitle', 'The Kovač Family');
+    await page.waitForTimeout(300);
+
     t.section('the zoom readout');
     await page.click('[data-action="fit"]');
     await page.waitForTimeout(400);
@@ -239,13 +260,61 @@ module.exports = async function (t, h) {
     await page.waitForTimeout(350);
     t.ok((await shown()) === atFit, 'zooming back out returns to the same figure');
 
+    t.section('the zoom menu');
     await page.click('#zoomLevel');
-    await page.waitForTimeout(350);
-    t.ok((await shown()) === '100%', 'clicking it resets to 100%');
+    await page.waitForTimeout(300);
+    t.ok(await page.locator('#zoomMenu').isVisible(), 'clicking the readout opens a menu');
+    t.ok(
+      (await page.inputValue('#zoomInput')) === String(parseInt(await shown(), 10)),
+      'seeded with the current zoom'
+    );
+
+    await page.fill('#zoomInput', '137');
+    await page.press('#zoomInput', 'Enter');
+    await page.waitForTimeout(400);
+    t.ok((await shown()) === '137%', 'a typed value is applied');
+    t.ok(
+      Math.abs((await page.evaluate(() => FT.zoomLevel())) - 1.37) < 0.005,
+      'and the canvas really is at that scale'
+    );
+    t.ok(!(await page.locator('#zoomMenu').isVisible()), 'the menu closes after setting');
+
+    await page.click('#zoomLevel');
+    await page.waitForTimeout(250);
+    await page.click('#zoomMenu [data-zoom="100"]');
+    await page.waitForTimeout(400);
+    t.ok((await shown()) === '100%', 'a preset sets the zoom');
     t.ok(
       Math.abs((await page.evaluate(() => FT.zoomLevel())) - 1) < 0.001,
       'and the canvas really is at 1:1'
     );
+
+    // Out-of-range input must be clamped, and say so rather than silently differ.
+    await page.click('#zoomLevel');
+    await page.waitForTimeout(250);
+    await page.fill('#zoomInput', '9000');
+    await page.press('#zoomInput', 'Enter');
+    await page.waitForTimeout(400);
+    t.ok((await shown()) === '250%', 'an absurd value is clamped to the maximum');
+    t.ok(
+      /limited to between/.test(await page.locator('#hintText').textContent()),
+      'and the clamp is explained'
+    );
+
+    await page.click('#zoomLevel');
+    await page.waitForTimeout(250);
+    await page.click('#zoomMenu [data-zoom="fit"]');
+    await page.waitForTimeout(500);
+    t.ok(!(await page.locator('#zoomMenu').isVisible()), 'Fit closes the menu');
+    t.ok((await page.locator('.card').first().isVisible()), 'and the tree is on screen');
+
+    await page.click('#zoomLevel');
+    await page.waitForTimeout(250);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    t.ok(!(await page.locator('#zoomMenu').isVisible()), 'Escape closes it');
+    await page.evaluate(() => FT.zoomTo(1));
+    await page.waitForTimeout(300);
 
     // Ctrl+scroll must keep the readout honest too.
     await page.mouse.move(700, 500);
@@ -265,6 +334,79 @@ module.exports = async function (t, h) {
     t.ok((await page.locator('#wordCount').count()) === 0, 'the chapter page shows no word count');
     await page.click('#closeBook');
     await page.waitForTimeout(400);
+
+    t.section('the detailed SVG keeps its text inside the cards');
+    // The reported bug: a long word was never broken, so "known for" ran clean
+    // out of its card and across the neighbouring one. Build a deliberately
+    // hostile tree and measure every drawn glyph against the card it belongs to.
+    const measured = await page.evaluate(() => {
+      const D = { w: 340, h: 244 };
+      const tree = FT.newTree('Overflow torture');
+      const mk = (attrs) => {
+        const p = FT.newPerson(attrs);
+        tree.people[p.id] = p;
+        return p;
+      };
+      const a = mk({
+        name: 'Marin Parin',
+        x: 0, y: 0,
+        birth: '1921-03-14', death: '1998-11-02',
+        birthplace: 'Sinj',
+        // exactly what broke it: one word with no spaces at all
+        knownFor: 'marinparin'.repeat(14),
+      });
+      const b = mk({
+        name: 'Bartholomew Maximilian Fitzwilliam-Kovačević the Third',
+        x: 220, y: 0,
+        birth: '1925-07-21',
+        birthplace: 'A Very Long Place Name In The Middle Of Absolutely Nowhere, Croatia',
+        knownFor: 'Kept the village school open through two hard winters and then ' +
+          'rebuilt the roof himself, twice, without ever once asking for help.',
+      });
+      mk({ name: 'Sparse', x: 440, y: 0 });
+      tree.unions[FT.uid('u')] = FT.newUnion({ partners: [a.id, b.id], children: [] });
+      FT.adoptDocument(tree);
+
+      const host = document.createElement('div');
+      host.style.cssText = 'position:absolute;left:-99999px;top:0;';
+      host.innerHTML = FT.buildDetailedSvg();
+      document.body.appendChild(host);
+
+      const worst = { over: 0, text: '' };
+      let checked = 0;
+      let brokenWord = false;
+      host.querySelectorAll('g[data-person]').forEach((card) => {
+        card.querySelectorAll('text').forEach((t) => {
+          const bb = t.getBBox();
+          checked++;
+          const over = Math.max(0, bb.x + bb.width - D.w, -bb.x, bb.y + bb.height - D.h, -bb.y);
+          if (over > worst.over) {
+            worst.over = over;
+            worst.text = t.textContent.slice(0, 40);
+          }
+          if (/^marinparin/.test(t.textContent) && t.textContent.length < 120) brokenWord = true;
+        });
+      });
+      const svg = host.innerHTML;
+      host.remove();
+      return { worst, checked, brokenWord, hasEllipsis: /…/.test(svg) };
+    });
+
+    t.ok(measured.checked > 20, 'measured every text run on the cards (' + measured.checked + ')');
+    t.ok(
+      measured.worst.over <= 1,
+      'nothing spills out of its card (worst overhang ' +
+        measured.worst.over.toFixed(1) + 'px' +
+        (measured.worst.text ? ' on "' + measured.worst.text + '"' : '') + ')'
+    );
+    t.ok(measured.brokenWord, 'a word too long for a line is broken instead of running on');
+    t.ok(measured.hasEllipsis, 'and what still does not fit is ellipsed');
+
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+    await page.click('[data-action="demo"]');
+    await page.waitForTimeout(600);
 
     t.section('the detailed SVG downloads');
     await page.click('#exportBtn');

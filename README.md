@@ -105,6 +105,10 @@ The detailed export scales the arrangement up around its much bigger cards, so
 the layout you built is preserved without them colliding. A sparse person gets a
 sparse card — rows appear only where there is something to show.
 
+Text is fitted by measuring it, not by counting characters: long words are
+broken, anything that still will not fit is ellipsed, and each card clips its
+own contents so a font substituted on another machine cannot let text escape.
+
 **Import** reads JSON only — a picture cannot be turned back into a family tree
 — and always opens as a *new* tree, so an import can never overwrite your work.
 It takes either a single tree or a whole backup.
@@ -118,8 +122,8 @@ copies of anyone's diaries.
 `N` new person · `A` tidy up · `F` fit to screen · `Enter` open book ·
 `Del` remove the selected person or link · `Esc` deselect ·
 `Ctrl+Z` / `Ctrl+Shift+Z` undo, redo · drag background to pan ·
-`Ctrl+scroll` to zoom; the toolbar shows the current zoom, and clicking it
-snaps back to 100%.
+`Ctrl+scroll` to zoom. The toolbar shows the current percentage; click it for a
+box to type an exact zoom into, with presets and Fit beside it.
 
 ## Layout
 
