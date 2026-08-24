@@ -86,6 +86,10 @@
       avatar +
       '<div class="meta">' +
         '<div class="name">' + FT.escapeHtml(p.name) + '</div>' +
+        (FT.bornAs(p)
+          ? '<div class="born" title="' + FT.escapeHtml(FT.bornAs(p)) + '">' +
+            FT.escapeHtml(FT.bornAs(p)) + '</div>'
+          : '') +
         '<div class="dates">' + FT.escapeHtml(FT.lifespan(p)) + '</div>' +
       '</div>' +
       '<button class="book-btn" title="Open life book" aria-label="Open life book">' +
@@ -116,7 +120,7 @@
       // Only rebuild the card when its contents actually changed — otherwise
       // every render re-decodes the portrait and the photo visibly flickers.
       const sig = [
-        p.name, p.birth, p.death, p.gender,
+        p.name, p.birth, p.death, p.gender, p.birthSurname,
         p.photo.length, p.photo.slice(-24),
       ].join('');
       if (el.dataset.sig !== sig) {

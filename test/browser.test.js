@@ -443,6 +443,46 @@ module.exports = async function (t, h) {
     await page.waitForTimeout(350);
     t.ok((await shown()) !== '100%', 'and it follows Ctrl+scroll zooming');
 
+    t.section('a birth surname on the card');
+    const cardFit = await page.evaluate(() => {
+      FT.zoomTo(1);
+      const ids = Object.keys(FT.state.people);
+      const a = ids.find((i) => FT.state.people[i].name.startsWith('Ana'));
+      // The worst a card can be asked to hold: a name that wraps to two lines,
+      // a long birth surname, and a full lifespan.
+      FT.state.people[a].name = 'Anastazija Marijana Kovačević';
+      FT.state.people[a].birthSurname = 'Kovačević-Buljan';
+      FT.render();
+      const card = document.querySelector('[data-id="' + a + '"]');
+      const born = card.querySelector('.born');
+      const meta = card.querySelector('.meta');
+      const cr = card.getBoundingClientRect();
+      const mr = meta.getBoundingClientRect();
+      const others = ids.filter((i) => i !== a && !FT.state.people[i].birthSurname);
+      return {
+        shown: !!born,
+        text: born ? born.textContent : '',
+        ellipsed: born ? born.scrollWidth > born.clientWidth : false,
+        insideVertically: mr.bottom <= cr.bottom - 9,
+        insideHorizontally: mr.right <= cr.right - 11,
+        absentWhenUnset: !document.querySelector('[data-id="' + others[0] + '"] .born'),
+        clipped: getComputedStyle(meta).overflow === 'hidden',
+      };
+    });
+    t.ok(cardFit.shown, 'the card shows the surname someone was born with');
+    t.ok(/^born /.test(cardFit.text), 'phrased "born X" (' + cardFit.text + ')');
+    t.ok(cardFit.absentWhenUnset, 'and nothing is drawn for people who never changed it');
+    t.ok(cardFit.insideVertically, 'a two-line name plus surname plus dates still fits the card');
+    t.ok(cardFit.insideHorizontally, 'and stays inside it horizontally');
+    t.ok(cardFit.ellipsed, 'a long surname is ellipsed rather than pushed out');
+    t.ok(cardFit.clipped, 'with the block clipped as a backstop');
+
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+    await page.click('[data-action="demo"]');
+    await page.waitForTimeout(600);
+
     t.section('the card and chapter page are uncluttered');
     t.ok((await page.locator('.card .entry-count').count()) === 0, 'cards show no chapter badge');
     await page.evaluate(() => {

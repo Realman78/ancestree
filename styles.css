@@ -426,18 +426,32 @@ body {
 }
 .card.drop-target .avatar { opacity: .5; }
 
-.meta { min-width: 0; }
+/* Clip as a backstop: a name, a birth surname and a lifespan is a lot for a
+   92px card, and a substituted font must not push text out of it. */
+.meta { min-width: 0; overflow: hidden; }
 .name {
   font-family: var(--serif);
   font-size: 15px;
-  line-height: 1.25;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
-.dates { font-size: 11.5px; color: var(--ink-soft); margin-top: 3px; letter-spacing: .02em; }
+/* The surname someone carried before marrying. One line — the card has 72px of
+   content height and a two-line name already claims most of it. */
+.born {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--ink-faint);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+.dates { font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; letter-spacing: .02em; }
 
 .book-btn {
   position: absolute;

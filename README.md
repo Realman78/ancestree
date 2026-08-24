@@ -83,8 +83,10 @@ open chapter, on ruled paper, which you just type into. It saves as you write.
 **Gender** is a field on each person (Woman / Man / Unspecified) that sets the
 card's tint and matches the legend in the bottom bar.
 
-**Born as** records the surname someone carried before marrying. It shows in the
-book and in the detailed export; the canvas card has no room for it.
+**Born as** records the surname someone carried before marrying. It shows on the
+card (`born Buljan`, under the name), in the book, and as its own row in the
+detailed export. A long one is ellipsed — the card has 72px of content height
+and a two-line name already claims most of it.
 
 Born and Died are date pickers, with a `≈` button beside each that swaps in a plain text box for the dates genealogy is
 actually made of — `c. 1880`, `spring 1943`, `before the war`. The field
