@@ -7,6 +7,7 @@
 const h = require('./helpers');
 
 const SUITES = [
+  { name: 'deploy', file: './deploy.test.js' },
   { name: 'model', file: './model.test.js' },
   { name: 'library', file: './library.test.js' },
   { name: 'app', file: './app.test.js' },

@@ -1,0 +1,15 @@
+# Same format as .gitignore. Everything listed here stays out of the deployment.
+# The published site should be the app and nothing else.
+
+node_modules
+test
+package.json
+package-lock.json
+server.js
+wrangler.jsonc
+.assetsignore
+.gitignore
+
+# Family trees exported while testing — these must never reach a public site.
+temp
+*.tree.json

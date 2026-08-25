@@ -1,0 +1,12 @@
+{
+  // Deployed as a Worker that serves static assets and nothing else.
+  // There is deliberately no "main": with no entrypoint, requests never run
+  // any code — Cloudflare serves the files straight from its edge.
+  "name": "ancestree",
+  "compatibility_date": "2026-08-25",
+  "assets": {
+    // The app lives at the repository root. .assetsignore keeps the parts
+    // that are not the app (tests, tooling) from being published.
+    "directory": "."
+  }
+}
