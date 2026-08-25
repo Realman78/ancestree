@@ -132,7 +132,9 @@ only for the tests.
 ## Open source, and why that matters here
 
 Ancestree is MIT licensed, and everything it does is in this repository — a few
-files of plain JavaScript you can read in an afternoon.
+files of plain JavaScript you can read in an afternoon. There is a link to it in
+the corner of the app, because a claim like this one is only worth making if
+checking it is easy.
 
 That is worth saying plainly for an app like this one. It asks you to write down
 your family's private history: births, deaths, marriages that ended, whatever

@@ -70,6 +70,55 @@ module.exports = async function (t, h) {
     await page.waitForTimeout(400);
     t.ok(!(await page.locator('#bookOverlay').isVisible()), 'Escape closes the book');
 
+    t.section('a way to the source');
+    // The README's claim that nothing leaves your browser is only worth making
+    // if you can go and check it, so the route has to exist in the app.
+    const src = await page.evaluate(() => {
+      const a = document.querySelector('.source-link');
+      if (!a) return null;
+      const bar = document.querySelector('.statusbar').getBoundingClientRect();
+      const box = a.getBoundingClientRect();
+      return {
+        href: a.href,
+        target: a.target,
+        rel: a.rel,
+        label: a.getAttribute('aria-label') || '',
+        inlineMark: !!a.querySelector('svg path'),
+        remoteAsset: !!a.querySelector('img'),
+        insideBar: box.right <= bar.right + 0.5 && box.left >= bar.left - 0.5,
+      };
+    });
+    t.ok(!!src, 'the status bar carries a link to the source');
+    t.ok(/^https:\/\/github\.com\/[\w-]+\/[\w-]+$/.test(src.href),
+      'pointing at a GitHub repository (' + src.href + ')');
+    t.ok(src.target === '_blank', 'opening in a new tab, so work in progress is not lost');
+    t.ok(/noopener/.test(src.rel), 'with noopener');
+    t.ok(src.label.length > 0, 'and an accessible name for the icon-only form');
+    t.ok(src.inlineMark && !src.remoteAsset,
+      'the mark is inline SVG — nothing is fetched from GitHub to draw it');
+    t.ok(src.insideBar, 'and it sits inside the bar');
+
+    // Narrow enough for a phone: the word goes, the mark and the name stay.
+    await page.setViewportSize({ width: 400, height: 800 });
+    await page.waitForTimeout(300);
+    const narrow = await page.evaluate(() => {
+      const a = document.querySelector('.source-link');
+      const bar = document.querySelector('.statusbar').getBoundingClientRect();
+      const overflow = [...document.querySelector('.statusbar').children]
+        .filter((c) => getComputedStyle(c).display !== 'none')
+        .some((c) => c.getBoundingClientRect().right > bar.right + 0.5);
+      return {
+        stillThere: a.getBoundingClientRect().width > 0,
+        wordHidden: getComputedStyle(a.querySelector('span')).display === 'none',
+        overflow,
+      };
+    });
+    t.ok(narrow.stillThere, 'on a phone the link survives');
+    t.ok(narrow.wordHidden, 'as the mark alone');
+    t.ok(!narrow.overflow, 'and nothing in the bar overflows');
+    await page.setViewportSize({ width: 1400, height: 900 });
+    await page.waitForTimeout(300);
+
     t.section('a new person is named in place');
     await page.evaluate(() => {
       localStorage.clear();

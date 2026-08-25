@@ -541,6 +541,29 @@ body {
 .tips { margin-left: auto; text-align: right; }
 .statusbar .btn.small { flex: 0 0 auto; }
 
+/* The claim that nothing leaves your browser is only worth making if you can
+   go and check it, so the way to the source lives in the app, not just in a
+   README nobody opens. */
+.source-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: color .13s, border-color .13s, background .13s;
+}
+.source-link svg { display: block; }
+.source-link:hover {
+  color: var(--walnut-dk);
+  border-color: var(--line);
+  background: #fffdf7;
+}
+.source-link:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
 /* ------------------------------------------------------------------ hint */
 
 .hint {
@@ -1060,6 +1083,11 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
 @media (max-width: 820px) {
   .tree-title { flex-basis: 150px; }
   .tips { display: none; }
+  /* The mark alone still reads, and the anchor keeps its aria-label. */
+  .source-link span { display: none; }
+  .source-link { padding: 4px 6px; }
+  /* .tips was doing the pushing; without it, keep the group on the right. */
+  .statusbar .btn.small { margin-left: auto; }
   .book { flex-direction: column; height: 90vh; }
   .spine { display: none; }
   .page-left { border-radius: 5px 5px 0 0; box-shadow: none; border-bottom: 1px solid var(--line); }
@@ -1079,6 +1107,12 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
     background: rgba(45,32,18,.62);
   }
   .tips { display: none; }
+}
+
+/* Phone width: the colour key is the first thing that can go — the card tints
+   are legible without it, and the book spells the field out anyway. */
+@media (max-width: 600px) {
+  .legend { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
