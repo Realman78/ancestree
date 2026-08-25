@@ -1,0 +1,9 @@
+# Cloudflare Pages. Filenames carry no content hash, so a long-lived cache could
+# pair a new index.html with an old stylesheet. Always revalidate: an unchanged
+# file still costs only a 304.
+/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Never let a stale worker pin an old build in place.
+/sw.js
+  Cache-Control: no-cache

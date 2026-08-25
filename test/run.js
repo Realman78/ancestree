@@ -13,6 +13,7 @@ const SUITES = [
   { name: 'export', file: './export.test.js' },
   { name: 'photo', file: './photo.test.js' },
   { name: 'browser', file: './browser.test.js', needsBrowser: true },
+  { name: 'offline', file: './offline.test.js', needsBrowser: true },
 ];
 
 /* The browser suite needs Chromium downloaded once. Report that clearly rather

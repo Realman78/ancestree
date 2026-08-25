@@ -595,6 +595,14 @@
     }
   });
 
+  /* Offline support, if the browser and the origin allow it. Purely a bonus —
+     the app works without it, so a failure here is not worth reporting. */
+  if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+
   // ------------------------------------------------------------- start up
 
   (async function boot() {

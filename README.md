@@ -64,6 +64,10 @@ square and shrunk to a thumbnail before being stored, so a tree stays small.
 **Undo everywhere.** Nothing asks "are you sure" — it happens, tells you what it
 did, and offers Undo.
 
+**Works offline, and installs.** Once you have opened it, it keeps working with
+no connection — on a plane, in a basement, at a relative's house with bad wifi.
+Your browser will also offer to install it as its own app.
+
 ## Keys
 
 `N` new person · `A` tidy up · `F` fit to screen · `Enter` open book ·
@@ -90,14 +94,17 @@ npx playwright install chromium   # once, for the browser tests
 npm test
 ```
 
-Six suites run against a real instance of the app: the document model and
-layout, the tree shelf, the wired-up page, export and import, photos, and a
+Seven suites run against a real instance of the app: the document model and
+layout, the tree shelf, the wired-up page, export and import, photos, a
 real-Chromium pass that does layout and hit-testing — the only one that can
-catch "it renders, but nothing is clickable".
+catch "it renders, but nothing is clickable" — and an offline pass that pulls
+the network out from under a live page.
 
 ```
 index.html        the canvas, the book, the menus
 styles.css        all of the styling
+sw.js             offline cache — network first, so it can never pin an old build
+manifest.webmanifest  makes it installable
 js/state.js       the document, relationships, undo
 js/library.js     many trees in local storage
 js/layout.js      the "Tidy up" engine
@@ -132,9 +139,15 @@ your family's private history: births, deaths, marriages that ended, whatever
 your grandmother told you once. So it should be **checkable**, not merely
 promised, that none of it goes anywhere.
 
-There is no analytics, no telemetry, no account, and nothing to log in to. The
-optional `server.js` serves files and stores nothing. The app makes no network
-requests at all — open `js/` and search for `fetch`, or watch your browser's
-network tab while you use it. There is nothing to find.
+There is no analytics, no telemetry, no account, and nothing to log in to.
+Nothing you write is ever sent anywhere.
+
+The only requests the app makes are for its own files — the page, the stylesheet,
+the scripts — from wherever you loaded it. `js/` contains no `fetch` call at all;
+the one in `sw.js` is the offline cache asking for those same files, and it
+refuses any address that is not this app's own. Watch your browser's network tab
+while you use it and you will see nothing else.
+
+The optional `server.js` serves files and stores nothing.
 
 Your family's history stays on your machine, in a file you own.
