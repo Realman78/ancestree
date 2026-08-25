@@ -144,6 +144,28 @@
     <svg id="guides" class="guides" aria-hidden="true"></svg>
     <div id="nodes" class="nodes"></div>
   </div>
+
+  <!-- Shown only while the open tree has nobody in it. Sits on the viewport
+       rather than the canvas, so it cannot be panned out of sight. -->
+  <div id="emptyState" class="empty-state">
+    <svg class="empty-mark" viewBox="0 0 24 24" width="46" height="46" aria-hidden="true">
+      <path d="M12 21V11M12 11a4 4 0 0 1 4-4h3M12 11a4 4 0 0 0-4-4H5"
+            fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <circle cx="12" cy="21" r="1.5" fill="currentColor"/>
+      <circle cx="19.5" cy="7" r="1.5" fill="currentColor"/>
+      <circle cx="4.5" cy="7" r="1.5" fill="currentColor"/>
+    </svg>
+    <p class="empty-lead">Every person you add gets a book to write their life into.</p>
+    <p class="empty-sub">Nothing you write ever leaves this device.</p>
+    <p class="empty-actions">
+      <button class="empty-btn" data-action="addFirst">+&nbsp;Person</button>
+      <span>to begin</span>
+    </p>
+    <p class="empty-alt">
+      or <button class="empty-link" data-action="demoEmpty">load a sample family</button>
+      to look around first.
+    </p>
+  </div>
 </main>
 
 <!-- Floating actions for the selected card -->

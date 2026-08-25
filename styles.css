@@ -1362,3 +1362,96 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
   }
   @page { margin: 20mm 18mm; }
 }
+
+/* ----------------------------------------------------- the empty board */
+
+/* Hidden by default; FT.render adds .board-empty to <body> when the open tree
+   has nobody in it. Deliberately not tied to what is on screen — someone who
+   has panned away from their tree still has a tree. */
+.empty-state {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 24px;
+  text-align: center;
+  /* The board underneath stays draggable; only the two actions take clicks. */
+  pointer-events: none;
+}
+body.board-empty .empty-state { display: flex; }
+
+.empty-mark { color: var(--line); margin-bottom: 14px; }
+
+.empty-lead {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 19px;
+  line-height: 1.45;
+  color: var(--ink);
+  max-width: 30ch;
+}
+.empty-sub {
+  margin: 0 0 22px;
+  font-size: 13.5px;
+  /* The strongest thing this app has to say — not a footnote. */
+  color: var(--ink-soft);
+}
+
+/* Two deliberate lines rather than one wrapping sentence: an inline button
+   makes line breaking unpredictable, and at some widths it stranded two words
+   on a line of their own. */
+.empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 10px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+.empty-alt {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-faint);
+  max-width: 40ch;
+  line-height: 1.7;
+}
+
+/* The words you read are the things you click, so nothing has to describe
+   where a button lives — a claim that would go stale as the bar reflows. */
+.empty-btn,
+.empty-link {
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+.empty-btn {
+  padding: 6px 13px;
+  border-radius: 8px;
+  border: 1px solid var(--walnut-dk);
+  background: linear-gradient(180deg, #9c6440, var(--walnut));
+  color: #fdf8ef;
+  box-shadow: 0 1px 3px rgba(58,44,28,.16);
+}
+.empty-btn:hover { background: linear-gradient(180deg, #a86e47, #7c4d31); }
+.empty-btn:active { transform: translateY(1px); }
+
+.empty-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--walnut);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.empty-link:hover { color: var(--walnut-dk); }
+
+.empty-btn:focus-visible,
+.empty-link:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+@media (max-width: 600px) {
+  .empty-lead { font-size: 17px; }
+}

@@ -149,6 +149,10 @@
       }
     });
 
+    // Every path that adds or removes a person ends here, so this is the one
+    // place that can keep the empty state honest.
+    document.body.classList.toggle('board-empty', list.length === 0);
+
     drawEdges();
     positionPill();
     positionEdgePill();
@@ -712,6 +716,9 @@
   }
 
   stage.addEventListener('pointerdown', function (e) {
+    // The empty-board actions sit over the stage; do not also start a pan.
+    if (e.target.closest && e.target.closest('.empty-state')) return;
+
     // A line is a relationship: clicking one selects it so it can be removed.
     const edgeEl = e.target.closest && e.target.closest('[data-kind]');
     if (edgeEl && !linkMode) {

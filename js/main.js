@@ -477,6 +477,12 @@
     import: function () {
       importInput.click();
     },
+    addFirst: function () {
+      actions.add();
+    },
+    demoEmpty: function () {
+      actions.demo();
+    },
     backupAll: function () {
       if (FT.exportAll()) {
         FT.emit('hint', { text: 'Backed up every tree into one file.' });
@@ -618,9 +624,7 @@
 
     // First visit: an empty board, not somebody else's family. The sample is a
     // click away in the status bar for anyone who wants to look around first.
+    // No toast here: the empty board says this itself, and stays put.
     FT.adoptDocument(FT.newTree('Our Family'));
-    FT.emit('hint', {
-      text: 'Empty board — add someone with "+ Person", or load the sample family below.',
-    });
   })();
 })();

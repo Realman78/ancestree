@@ -48,6 +48,69 @@ module.exports = async function (t, h) {
       t.ok((await page.locator(sel).boundingBox()) === null, sel + ' occupies no space while hidden');
     }
 
+    t.section('the empty board tells you how to start');
+    // An empty canvas gives a first-time visitor nothing to act on, so the board
+    // says what the app is for and carries the two ways in.
+    const empty = page.locator('#emptyState');
+    t.ok((await page.locator('.card').count()) === 0, 'the board starts with nobody on it');
+    t.ok(await empty.isVisible(), 'and the empty board explains itself');
+
+    // It covers the whole stage. The words must let a drag through to the board
+    // beneath, and the buttons must not let one through — a click that shifts
+    // the canvas under your cursor feels broken.
+    const transform = () => page.evaluate(() => document.getElementById('viewport').style.transform);
+    const atRest = await transform();
+    const lead = await page.locator('.empty-lead').boundingBox();
+    await page.mouse.move(lead.x + 20, lead.y + lead.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(lead.x + 160, lead.y + 100, { steps: 6 });
+    await page.mouse.up();
+    t.ok((await transform()) !== atRest, 'the board still pans behind the words');
+
+    const held = await transform();
+    const btn = await page.locator('.empty-btn').boundingBox();
+    await page.mouse.move(btn.x + btn.width / 2, btn.y + btn.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(btn.x + btn.width / 2 + 40, btn.y + btn.height + 220, { steps: 6 });
+    await page.mouse.up();
+    t.ok((await transform()) === held, 'but pressing an action does not drag the board');
+    t.ok((await page.locator('.card').count()) === 0, 'and releasing away from it adds nobody');
+
+
+    await page.click('[data-action="addFirst"]');
+    await page.waitForTimeout(400);
+    t.ok((await page.locator('.card').count()) === 1, 'its "+ Person" adds the first person');
+    t.ok(!(await empty.isVisible()), 'and the message steps aside');
+    // Escape in the naming field undoes the add, which would empty the board
+    // again; finish the name the way a real first user would.
+    await page.keyboard.type('Ada Miller');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    t.ok((await page.locator('.card').count()) === 1, 'naming them keeps them');
+
+    // "Empty" means nobody in the tree, not nothing in view. Panning the only
+    // card off-screen must not bring back an invitation to start over.
+    await page.evaluate(() => {
+      const stage = document.getElementById('stage');
+      const r = stage.getBoundingClientRect();
+      const at = (t, x, y) =>
+        stage.dispatchEvent(new PointerEvent(t, { clientX: x, clientY: y, bubbles: true, buttons: 1, pointerId: 1 }));
+      at('pointerdown', r.left + 700, r.top + 400);
+      at('pointermove', r.left - 4000, r.top - 3000);
+      at('pointerup', r.left - 4000, r.top - 3000);
+    });
+    await page.waitForTimeout(300);
+    t.ok(!(await empty.isVisible()), 'panning the tree out of view does not bring it back');
+
+    await page.evaluate(() => FT.adoptDocument(FT.newTree('Our Family')));
+    await page.waitForTimeout(400);
+    t.ok(await empty.isVisible(), 'emptying the tree brings it back');
+    await page.click('[data-action="demoEmpty"]');
+    await page.waitForTimeout(500);
+    t.ok((await page.locator('.card').count()) === 9, 'and its second action loads the sample');
+    await page.evaluate(() => FT.adoptDocument(FT.newTree('Our Family')));
+    await page.waitForTimeout(400);
+
     t.section('first visit and the sample');
     t.ok((await page.locator('.card').count()) === 0, 'a first visit shows an empty board');
     await page.click('[data-action="demo"]');

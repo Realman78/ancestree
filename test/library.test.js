@@ -10,7 +10,12 @@ module.exports = async function (t, h) {
   t.section('a first visit starts empty');
   t.ok($$('.card').length === 0, 'no cards on the board');
   t.ok(Object.keys(FT.state.people).length === 0, 'and no people in the document');
-  t.ok(/Empty board/.test($('#hintText').textContent), 'the board says what to do next');
+  // The guidance lives on the board itself now, not in a toast that fades.
+  t.ok(d.body.classList.contains('board-empty'), 'the board knows it is empty');
+  t.ok(/book to write their life into/.test($('#emptyState').textContent),
+    'and says what the app is for');
+  t.ok(!!$('#emptyState [data-action="addFirst"]') && !!$('#emptyState [data-action="demoEmpty"]'),
+    'offering both ways in');
   t.ok(!/Miller/.test(JSON.stringify(FT.state)), "a stranger's family is not loaded over the top");
 
   t.section('the sample is a click away');
