@@ -65,7 +65,9 @@
   FT.fitToScreen = function () {
     const b = FT.contentBounds();
     const r = stage.getBoundingClientRect();
-    const pad = 80;
+    // 80px of margin each side is a comfortable frame on a desktop and 39% of
+    // a phone's width, which forced the zoom far lower than it needed to be.
+    const pad = Math.min(80, Math.round(r.width * 0.08));
     const z = Math.min(1.2, Math.max(0.25, Math.min(
       (r.width - pad * 2) / Math.max(1, b.w),
       (r.height - pad * 2) / Math.max(1, b.h)
@@ -715,9 +717,48 @@
     guides.innerHTML = html;
   }
 
+  /* ---------------------------------------------- pinch to zoom (touch)
+
+     A phone has no wheel, so without this the canvas can only be zoomed from
+     the toolbar. Two fingers zoom around their own midpoint and pan with it,
+     which is what every map on a phone does. */
+  const pointers = new Map();
+  let pinch = null;
+
+  function pinchState() {
+    const pts = Array.from(pointers.values());
+    return {
+      dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1,
+      mx: (pts[0].x + pts[1].x) / 2,
+      my: (pts[0].y + pts[1].y) / 2,
+    };
+  }
+
+  // A second finger turns whatever the first one started into a pinch. Put the
+  // card down where it is rather than dragging it along with the gesture.
+  function stopDragForPinch() {
+    if (!drag) return;
+    if (drag.pan) {
+      stage.classList.remove('panning');
+    } else {
+      const el = cards[drag.id];
+      if (el) el.classList.remove('dragging');
+      guides.innerHTML = '';
+      if (drag.moved) FT.save();
+    }
+    drag = null;
+  }
+
   stage.addEventListener('pointerdown', function (e) {
     // The empty-board actions sit over the stage; do not also start a pan.
     if (e.target.closest && e.target.closest('.empty-state')) return;
+
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size >= 2) {
+      stopDragForPinch();
+      pinch = pointers.size === 2 ? pinchState() : null;
+      return;
+    }
 
     // A line is a relationship: clicking one selects it so it can be removed.
     const edgeEl = e.target.closest && e.target.closest('[data-kind]');
@@ -793,6 +834,20 @@
   });
 
   stage.addEventListener('pointermove', function (e) {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pinch && pointers.size === 2) {
+      const now = pinchState();
+      // zoomBy already pins the point under the midpoint, so this only has to
+      // add what the midpoint itself moved.
+      FT.zoomBy(now.dist / pinch.dist, now.mx, now.my);
+      view.x += now.mx - pinch.mx;
+      view.y += now.my - pinch.my;
+      applyView();
+      pinch = now;
+      return;
+    }
+
     if (!drag) return;
 
     if (drag.pan) {
@@ -821,6 +876,15 @@
   });
 
   function endDrag(e) {
+    pointers.delete(e.pointerId);
+
+    // Lifting one finger of a pinch must not hand the other one a pan: that
+    // would jump the canvas by however far apart they were.
+    if (pinch) {
+      pinch = pointers.size === 2 ? pinchState() : null;
+      return;
+    }
+
     if (!drag) return;
     if (drag.pan) {
       stage.classList.remove('panning');
@@ -839,6 +903,18 @@
 
   stage.addEventListener('pointerup', endDrag);
   stage.addEventListener('pointercancel', endDrag);
+
+  // Belt and braces. Touch pointers are implicitly captured by whatever took
+  // the pointerdown, so the release does reach the stage today even when the
+  // finger ends up over the toolbar — and a mouse reuses one pointerId, so it
+  // cannot pile up either. Neither guarantee is ours to rely on, and a
+  // left-behind id would read as the second finger of a pinch.
+  function forgetPointer(e) {
+    if (!pointers.delete(e.pointerId)) return;
+    if (pinch) pinch = pointers.size === 2 ? pinchState() : null;
+  }
+  window.addEventListener('pointerup', forgetPointer);
+  window.addEventListener('pointercancel', forgetPointer);
 
   stage.addEventListener('dblclick', function (e) {
     const cardEl = e.target.closest('.card');

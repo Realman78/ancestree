@@ -612,6 +612,11 @@ body {
   background: rgba(35,26,16,.55);
   backdrop-filter: blur(3px);
   display: grid;
+  /* An implicit `auto` track grows to the book's max-content width, and the
+     book's `100%` then resolves against that oversized track — which is how it
+     came to stick out past a phone screen. minmax(0,1fr) pins it to the
+     overlay instead. */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 24px;
   z-index: 80;
@@ -624,6 +629,10 @@ body {
   position: relative;
   display: flex;
   width: min(1000px, 100%);
+  /* A grid item's min-width is `auto`, i.e. min-content, which beats the width
+     above. Without this the date pickers inside hold the book open wider than
+     a phone screen. */
+  min-width: 0;
   height: min(660px, 88vh);
   background: #efe6d2;
   border-radius: 8px;
@@ -797,7 +806,7 @@ input.person-name:focus { outline: none; border-bottom-color: var(--gold); }
 
 /* Born / Died date pickers */
 .pf-datewrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.pf-datepick { flex: 0 1 auto; font-variant-numeric: tabular-nums; }
+.pf-datepick { flex: 0 1 auto; min-width: 0; font-variant-numeric: tabular-nums; }
 .pf-datetext { flex: 1 1 auto; min-width: 0; font-style: italic; }
 .pf-legacy {
   flex: 0 1 auto;
@@ -1107,6 +1116,69 @@ input.entry-title:focus { outline: none; border-bottom-color: var(--gold); }
     background: rgba(45,32,18,.62);
   }
   .tips { display: none; }
+  /* A finger is not a cursor. The toolbar's 31px controls are hard to hit
+     without being sure; 38px is comfortable and still leaves the canvas the
+     bulk of a phone screen. */
+  .btn { min-height: 38px; }
+  .btn.icon { height: 38px; min-width: 38px; }
+  .btn.with-icon { height: 38px; }
+  .zoom-level { height: 38px; }
+  .tree-menu-btn { min-height: 38px; }
+  .tree-title { padding: 8px 9px; }
+}
+
+/* Phone width: the toolbar cannot sit on one line beside the tree name. Left
+   alone it runs off the right edge, and a page wider than the screen makes the
+   browser shrink the whole layout to fit — which was pushing the life book off
+   screen too. Give the tools a row of their own and let them wrap: everything
+   stays reachable, and nothing hides behind a swipe. */
+@media (max-width: 700px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    padding: 8px 10px;
+  }
+  .brand { font-size: 17px; }
+  /* Brand and tree name are 26px too wide together for a 412px screen, and
+     wrapping cost a whole row. Let the name give up that much instead. */
+  .tree-id { flex: 1 1 120px; min-width: 0; }
+  .tree-title { flex: 1 1 auto; min-width: 0; }
+  .tools {
+    margin-left: 0;
+    width: 100%;
+    gap: 8px;
+  }
+
+  /* The menus hang off their own button, which on a phone puts them half off
+     the screen. Hand the containing block to the topbar instead so they span
+     the width and drop below the whole bar. The two-class selectors beat
+     .zoom-menu's own left/transform further down the file. */
+  .tree-id,
+  .menu-wrap { position: static; }
+  .topbar { position: relative; }
+  .topbar .tree-menu,
+  .topbar .dropdown {
+    top: calc(100% + 6px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    transform: none;
+    max-height: 66vh;
+    overflow-y: auto;
+  }
+}
+
+/* Very narrow phones (an iPhone SE is 320px). At the sizes above, the tools
+   need three rows and eat 42% of the screen. Trimming the padding is enough to
+   pack them into two without dropping a single control. */
+@media (max-width: 380px) {
+  .topbar { gap: 6px 8px; padding: 7px 8px; }
+  .tools { gap: 6px; }
+  .tool-group { gap: 5px; }
+  .btn { padding: 7px 9px; font-size: 12.5px; }
+  .btn.icon { padding: 7px 6px; min-width: 30px; }
+  .zoom-level { min-width: 46px; }
+  .brand { font-size: 15px; }
 }
 
 /* Phone width: the colour key is the first thing that can go — the card tints
