@@ -60,7 +60,9 @@ module.exports = async function (t, h) {
     // the canvas under your cursor feels broken.
     const transform = () => page.evaluate(() => document.getElementById('viewport').style.transform);
     const atRest = await transform();
-    const lead = await page.locator('.empty-lead').boundingBox();
+    // .first(): the board carries more than one lead paragraph, and any of
+    // them is a piece of the message to try dragging through.
+    const lead = await page.locator('.empty-lead').first().boundingBox();
     await page.mouse.move(lead.x + 20, lead.y + lead.height / 2);
     await page.mouse.down();
     await page.mouse.move(lead.x + 160, lead.y + 100, { steps: 6 });
